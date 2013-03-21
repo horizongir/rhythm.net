@@ -79,7 +79,7 @@ namespace Rhythm.Net
             // Set default values for all register settings
             adcReferenceBw = 3;         // ADC reference generator bandwidth (0 [highest BW] - 3 [lowest BW]);
             // always set to 3
-            FastSettleOff();            // amplifier fast settle (off = normal operation)
+            SetFastSettle(false);       // amplifier fast settle (off = normal operation)
             ampVrefEnable = 1;          // enable amplifier voltage references (0 = power down; 1 = enable);
             // 1 = normal operation
             adcComparatorBias = 3;      // ADC comparator preamp bias current (0 [lowest] - 3 [highest], only
@@ -108,7 +108,7 @@ namespace Rhythm.Net
             twosComp = 0;               // two's complement ADC results (0 = unsigned offset representation; 1 = signed
             // representation)
             absMode = 0;                // absolute value mode (0 = normal output; 1 = output passed through abs(x) function)
-            EnableDsp();                // DSP offset removal enable/disable
+            EnableDsp(true);            // DSP offset removal enable/disable
             SetDspCutoffFreq(1.0);      // DSP offset removal HPF cutoff freqeuncy
 
             zcheckDacPower = 0;         // impedance testing DAC power-up (0 = power down; 1 = power up)
@@ -117,16 +117,16 @@ namespace Rhythm.Net
             zcheckConnAll = 0;          // impedance testing connect all (0 = normal operation; 1 = connect all electrodes together)
             SetZcheckPolarity(ZcheckPolarity.ZcheckPositiveInput); // impedance testing polarity select (RHD2216 only) (0 = test positive inputs;
             // 1 = test negative inputs)
-            DisableZcheck();            // impedance testing enable/disable
+            EnableZcheck(false);        // impedance testing enable/disable
 
             SetZcheckChannel(0);        // impedance testing amplifier select (0-63, but MSB is ignored, so 0-31 in practice)
 
             offChipRH1 = 0;             // bandwidth resistor RH1 on/off chip (0 = on chip; 1 = off chip)
             offChipRH2 = 0;             // bandwidth resistor RH2 on/off chip (0 = on chip; 1 = off chip)
             offChipRL = 0;              // bandwidth resistor RL on/off chip (0 = on chip; 1 = off chip)
-            adcAux1En = 0;              // enable ADC aux1 input (when RH1 is on chip) (0 = disable; 1 = enable)
-            adcAux2En = 0;              // enable ADC aux2 input (when RH2 is on chip) (0 = disable; 1 = enable)
-            adcAux3En = 0;              // enable ADC aux3 input (when RL is on chip) (0 = disable; 1 = enable)
+            adcAux1En = 1;              // enable ADC aux1 input (when RH1 is on chip) (0 = disable; 1 = enable)
+            adcAux2En = 1;              // enable ADC aux2 input (when RH2 is on chip) (0 = disable; 1 = enable)
+            adcAux3En = 1;              // enable ADC aux3 input (when RL is on chip) (0 = disable; 1 = enable)
 
             SetUpperBandwidth(10000.0); // set upper bandwidth of amplifiers
             SetLowerBandwidth(1.0);     // set lower bandwidth of amplifiers
@@ -189,16 +189,11 @@ namespace Rhythm.Net
             }
         }
 
-        // Enable amplifier fast settle function; drive amplifiers to baseline
-        public void FastSettleOn()
+        // Enable or disable amplifier fast settle function; drive amplifiers to baseline
+        // if enabled.
+        public void SetFastSettle(bool enabled)
         {
-            ampFastSettle = 1;
-        }
-
-        // Disable amplifier fast settle function (normal operating condition)
-        public void FastSettleOff()
-        {
-            ampFastSettle = 0;
+            ampFastSettle = (enabled ? 1 : 0);
         }
 
         // Drive auxiliary digital output low
@@ -222,16 +217,28 @@ namespace Rhythm.Net
             digOutHiZ = 1;
         }
 
-        // Enable DSP offset removal filter
-        public void EnableDsp()
+        // Enable or disable ADC auxiliary input 1
+        public void EnableAux1(bool enabled)
         {
-            dspEn = 1;
+            adcAux1En = (enabled ? 1 : 0);
         }
 
-        // Disable DSP offset removal filter
-        public void DisableDsp()
+        // Enable or disable ADC auxiliary input 2
+        public void EnableAux2(bool enabled)
         {
-            dspEn = 0;
+            adcAux2En = (enabled ? 1 : 0);
+        }
+
+        // Enable or disable ADC auxiliary input 3
+        public void EnableAux3(bool enabled)
+        {
+            adcAux3En = (enabled ? 1 : 0);
+        }
+
+        // Enable or disable DSP offset removal filter
+        public void EnableDsp(bool enabled)
+        {
+            dspEn = (enabled ? 1 : 0);
         }
 
         // Set the DSP offset removal filter cutoff frequency as closely to the requested
@@ -290,16 +297,16 @@ namespace Rhythm.Net
             return sampleRate * Math.Log(x / (x - 1.0)) / (2 * Math.PI);
         }
 
-        // Enable impedance checking mode
-        public void EnableZcheck()
+        // Enable or disable impedance checking mode
+        public void EnableZcheck(bool enabled)
         {
-            zcheckEn = 1;
+            zcheckEn = (enabled ? 1 : 0);
         }
 
-        // Disable impedance checking mode
-        public void DisableZcheck()
+        // Power up or down impedance checking DAC
+        public void SetZcheckDacPower(bool enabled)
         {
-            zcheckEn = 0;
+            zcheckDacPower = (enabled ? 1 : 0);
         }
 
         // Select the series capacitor used to convert the voltage waveform generated by the on-chip
@@ -351,21 +358,12 @@ namespace Rhythm.Net
 
         }
 
-        // Power up selected amplifier on chip
-        public void PowerUpAmp(int channel)
+        // Power up or down selected amplifier on chip
+        public void SetAmpPowered(int channel, bool powered)
         {
-            if (channel >= 0 && channel < aPwr.Length)
+            if (channel >= 0 && channel <= 31)
             {
-                aPwr[channel] = 1;
-            }
-        }
-
-        // Power down selected amplifier on chip
-        public void PowerDownAmp(int channel)
-        {
-            if (channel >= 0 && channel < aPwr.Length)
-            {
-                aPwr[channel] = 0;
+                aPwr[channel] = (powered ? 1 : 0);
             }
         }
 
@@ -492,7 +490,7 @@ namespace Rhythm.Net
                 upperBandwidth = 30000.0;
             }
 
-            rH1Target = rH1FromUpperBandwidth(upperBandwidth);
+            rH1Target = RH1FromUpperBandwidth(upperBandwidth);
 
             rH1Dac1 = 0;
             rH1Dac2 = 0;
@@ -516,7 +514,7 @@ namespace Rhythm.Net
                 }
             }
 
-            rH2Target = rH2FromUpperBandwidth(upperBandwidth);
+            rH2Target = RH2FromUpperBandwidth(upperBandwidth);
 
             rH2Dac1 = 0;
             rH2Dac2 = 0;
@@ -542,8 +540,8 @@ namespace Rhythm.Net
 
             double actualUpperBandwidth1, actualUpperBandwidth2;
 
-            actualUpperBandwidth1 = upperBandwidthFromRH1(rH1Actual);
-            actualUpperBandwidth2 = upperBandwidthFromRH2(rH2Actual);
+            actualUpperBandwidth1 = UpperBandwidthFromRH1(rH1Actual);
+            actualUpperBandwidth2 = UpperBandwidthFromRH2(rH2Actual);
 
             // Upper bandwidth estimates calculated from actual RH1 value and acutal RH2 value
             // should be very close; we will take their geometric mean to get a single
@@ -596,7 +594,7 @@ namespace Rhythm.Net
                 lowerBandwidth = 1500.0;
             }
 
-            rLTarget = rLFromLowerBandwidth(lowerBandwidth);
+            rLTarget = RLFromLowerBandwidth(lowerBandwidth);
 
             rLDac1 = 0;
             rLDac2 = 0;
@@ -627,7 +625,7 @@ namespace Rhythm.Net
                 }
             }
 
-            actualLowerBandwidth = lowerBandwidthFromRL(rLActual);
+            actualLowerBandwidth = LowerBandwidthFromRL(rLActual);
 
             /*
             cout << endl;
@@ -654,95 +652,95 @@ namespace Rhythm.Net
         // Create a list of 60 commands to program most RAM registers on a RHD2000 chip, read those values
         // back to confirm programming, read ROM registers, and (if calibrate == true) run ADC calibration.
         // Returns the length of the command list.
-        int createCommandListRegisterConfig(List<int> commandList, bool calibrate)
+        public int CreateCommandListRegisterConfig(List<int> commandList, bool calibrate)
         {
             commandList.Clear();    // if command list already exists, erase it and start a new one
 
             // Start with a few dummy commands in case chip is still powering up
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
 
             // Program RAM registers
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 0, GetRegisterValue(0)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 1, GetRegisterValue(1)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 2, GetRegisterValue(2)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 0, GetRegisterValue(0)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 1, GetRegisterValue(1)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 2, GetRegisterValue(2)));
             // Don't program Register 3 (MUX Load, Temperature Sensor, and Auxiliary Digital Output);
             // control temperature sensor in another command stream
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 4, GetRegisterValue(4)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 5, GetRegisterValue(5)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 4, GetRegisterValue(4)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 5, GetRegisterValue(5)));
             // Don't program Register 6 (Impedance Check DAC) here; create DAC waveform in another command stream
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 7, GetRegisterValue(7)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 8, GetRegisterValue(8)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 9, GetRegisterValue(9)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 10, GetRegisterValue(10)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 11, GetRegisterValue(11)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 12, GetRegisterValue(12)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 13, GetRegisterValue(13)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 14, GetRegisterValue(14)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 15, GetRegisterValue(15)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 16, GetRegisterValue(16)));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 17, GetRegisterValue(17)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 7, GetRegisterValue(7)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 8, GetRegisterValue(8)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 9, GetRegisterValue(9)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 10, GetRegisterValue(10)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 11, GetRegisterValue(11)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 12, GetRegisterValue(12)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 13, GetRegisterValue(13)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 14, GetRegisterValue(14)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 15, GetRegisterValue(15)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 16, GetRegisterValue(16)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 17, GetRegisterValue(17)));
 
             // Read ROM registers
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 62));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 61));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 60));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 59));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 62));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 61));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 60));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 59));
 
             // Read chip name from ROM
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 48));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 49));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 50));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 51));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 52));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 53));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 54));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 55));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 48));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 49));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 50));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 51));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 52));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 53));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 54));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 55));
 
             // Read Intan name from ROM
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 40));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 41));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 42));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 43));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 44));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 40));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 41));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 42));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 43));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 44));
 
             // Read back RAM registers to confirm programming
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 0));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 1));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 2));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 3));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 4));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 5));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 6));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 7));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 8));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 9));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 10));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 11));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 12));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 13));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 14));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 15));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 16));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 17));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 0));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 1));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 2));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 3));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 4));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 5));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 6));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 7));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 8));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 9));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 10));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 11));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 12));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 13));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 14));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 15));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 16));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 17));
 
             // Optionally, run ADC calibration (should only be run once after board is plugged in)
             if (calibrate)
             {
-                commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandCalibrate));
+                commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandCalibrate));
             }
             else
             {
-                commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
+                commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
             }
 
             // End with a few dummy commands
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));
 
             return commandList.Count;
         }
@@ -758,7 +756,7 @@ namespace Rhythm.Net
         // different RAM banks, and the appropriate command list selected at the right time.
         //
         // Returns the length of the command list.
-        int createCommandListTempSensor(List<int> commandList)
+        public int CreateCommandListTempSensor(List<int> commandList)
         {
             int i;
 
@@ -766,55 +764,55 @@ namespace Rhythm.Net
 
             tempEn = 1;
 
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
             tempS1 = tempEn;
             tempS2 = 0;
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 3, GetRegisterValue(3)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 3, GetRegisterValue(3)));
 
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
             tempS1 = tempEn;
             tempS2 = tempEn;
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 3, GetRegisterValue(3)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 3, GetRegisterValue(3)));
 
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 49));     // sample Temperature Sensor
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 49));     // sample Temperature Sensor
 
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
             tempS1 = 0;
             tempS2 = tempEn;
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 3, GetRegisterValue(3)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 3, GetRegisterValue(3)));
 
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 49));     // sample Temperature Sensor
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 49));     // sample Temperature Sensor
 
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
             tempS1 = 0;
             tempS2 = 0;
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 3, GetRegisterValue(3)));
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 3, GetRegisterValue(3)));
 
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
-            commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 48));     // sample Supply Voltage Sensor
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
+            commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 48));     // sample Supply Voltage Sensor
 
             for (i = 0; i < 8; ++i)
             {
-                commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
-                commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
-                commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
-                commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));      // dummy command
+                commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 32));     // sample AuxIn1
+                commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 33));     // sample AuxIn2
+                commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandConvert, 34));     // sample AuxIn3
+                commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegRead, 63));      // dummy command
             }
 
             return commandList.Count;
@@ -824,7 +822,7 @@ namespace Rhythm.Net
         // amplitude (in DAC steps, 0-128) using the on-chip impedance testing voltage DAC.  If frequency is set to zero,
         // a DC baseline waveform is created.
         // Returns the length of the command list.
-        int createCommandListZcheckDac(List<int> commandList, double frequency, double amplitude)
+        public int CreateCommandListZcheckDac(List<int> commandList, double frequency, double amplitude)
         {
             int i, period, value;
             double t;
@@ -847,7 +845,7 @@ namespace Rhythm.Net
             {
                 for (i = 0; i < MaxCommandLength; ++i)
                 {
-                    commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 6, 128));
+                    commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 6, 128));
                 }
             }
             else
@@ -871,7 +869,7 @@ namespace Rhythm.Net
                         {
                             value = 255;
                         }
-                        commandList.Add(createRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 6, value));
+                        commandList.Add(CreateRhd2000Command(Rhd2000CommandType.Rhd2000CommandRegWrite, 6, value));
                         t += 1.0 / sampleRate;
                     }
                 }
@@ -881,7 +879,7 @@ namespace Rhythm.Net
         }
 
         // Return a 16-bit MOSI command (CALIBRATE or CLEAR)
-        public int createRhd2000Command(Rhd2000CommandType commandType)
+        public int CreateRhd2000Command(Rhd2000CommandType commandType)
         {
             switch (commandType)
             {
@@ -895,7 +893,7 @@ namespace Rhythm.Net
         }
 
         // Return a 16-bit MOSI command (CONVERT or READ)
-        int createRhd2000Command(Rhd2000CommandType commandType, int arg1)
+        public int CreateRhd2000Command(Rhd2000CommandType commandType, int arg1)
         {
             switch (commandType)
             {
@@ -919,7 +917,7 @@ namespace Rhythm.Net
         }
 
         // Return a 16-bit MOSI command (WRITE)
-        int createRhd2000Command(Rhd2000CommandType commandType, int arg1, int arg2)
+        public int CreateRhd2000Command(Rhd2000CommandType commandType, int arg1, int arg2)
         {
             switch (commandType)
             {
@@ -941,7 +939,7 @@ namespace Rhythm.Net
 
         // Returns the value of the RH1 resistor (in ohms) corresponding to a particular upper
         // bandwidth value (in Hz).
-        double rH1FromUpperBandwidth(double upperBandwidth)
+        double RH1FromUpperBandwidth(double upperBandwidth)
         {
             double log10f = Math.Log10(upperBandwidth);
 
@@ -950,7 +948,7 @@ namespace Rhythm.Net
 
         // Returns the value of the RH2 resistor (in ohms) corresponding to a particular upper
         // bandwidth value (in Hz).
-        double rH2FromUpperBandwidth(double upperBandwidth)
+        double RH2FromUpperBandwidth(double upperBandwidth)
         {
             double log10f = Math.Log10(upperBandwidth);
 
@@ -959,7 +957,7 @@ namespace Rhythm.Net
 
         // Returns the value of the RL resistor (in ohms) corresponding to a particular lower
         // bandwidth value (in Hz).
-        double rLFromLowerBandwidth(double lowerBandwidth)
+        double RLFromLowerBandwidth(double lowerBandwidth)
         {
             double log10f = Math.Log10(lowerBandwidth);
 
@@ -976,7 +974,7 @@ namespace Rhythm.Net
 
         // Returns the amplifier upper bandwidth (in Hz) corresponding to a particular value
         // of the resistor RH1 (in ohms).
-        double upperBandwidthFromRH1(double rH1)
+        double UpperBandwidthFromRH1(double rH1)
         {
             double a, b, c;
 
@@ -989,7 +987,7 @@ namespace Rhythm.Net
 
         // Returns the amplifier upper bandwidth (in Hz) corresponding to a particular value
         // of the resistor RH2 (in ohms).
-        double upperBandwidthFromRH2(double rH2)
+        double UpperBandwidthFromRH2(double rH2)
         {
             double a, b, c;
 
@@ -1002,7 +1000,7 @@ namespace Rhythm.Net
 
         // Returns the amplifier lower bandwidth (in Hz) corresponding to a particular value
         // of the resistor RL (in ohms).
-        double lowerBandwidthFromRL(double rL)
+        double LowerBandwidthFromRL(double rL)
         {
             double a, b, c;
 
