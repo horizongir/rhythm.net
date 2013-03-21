@@ -9,9 +9,10 @@ namespace Rhythm.Net
 {
     public class Rhd2000EvalBoard
     {
-        const int USB_BUFFER_SIZE = 360000;
-        const int MAX_NUM_DATA_STREAMS = 8;
+        const int USB_BUFFER_SIZE = 2400000;
         const uint RHYTHM_BOARD_ID = 500;
+        const int MAX_NUM_DATA_STREAMS = 8;
+        const int FIFO_CAPACITY_WORDS = 67108864;
 
         okCFrontPanel dev;
         AmplifierSampleRate sampleRate;
@@ -38,8 +39,8 @@ namespace Rhythm.Net
         }
 
         // Find an Opal Kelly XEM6010-LX45 board attached to a USB port and open it.
-        // Returns true if successful.
-        bool open()
+        // Throws if FrontPanel cannot be loaded or if XEM6010 can't be found.
+        public void Open()
         {
             byte[] dll_date = new byte[32], dll_time = new byte[32];
             string serialNumber = "";
@@ -78,17 +79,15 @@ namespace Rhythm.Net
             dev.LoadDefaultPLLConfiguration();
 
             // Get some general information about the XEM.
-            Console.WriteLine("FPGA system clock: " + getSystemClockFreq() + " MHz"); // Should indicate 100 MHz
+            Console.WriteLine("FPGA system clock: " + GetSystemClockFreq() + " MHz"); // Should indicate 100 MHz
             Console.WriteLine("Opal Kelly device firmware version: " + dev.GetDeviceMajorVersion() + "." +
                     dev.GetDeviceMinorVersion());
             Console.WriteLine("Opal Kelly device serial number: " + dev.GetSerialNumber());
             Console.WriteLine("Opal Kelly device ID string: " + dev.GetDeviceID());
-
-            return (true);
         }
 
         // Uploads the configuration file (bitfile) to the FPGA.  Returns true if successful.
-        void uploadFpgaBitfile(string filename)
+        public void UploadFpgaBitfile(string filename)
         {
             okCFrontPanel.ErrorCode errorCode = dev.ConfigureFPGA(filename);
 
@@ -136,85 +135,88 @@ namespace Rhythm.Net
         }
 
         // Initialize Rhythm FPGA to default starting values.
-        void initialize()
+        public void Initialize()
         {
             int i;
 
-            resetBoard();
-            setSampleRate(AmplifierSampleRate.SampleRate30000Hz);
-            selectAuxCommandBank(BoardPort.PortA, AuxCmdSlot.AuxCmd1, 0);
-            selectAuxCommandBank(BoardPort.PortB, AuxCmdSlot.AuxCmd1, 0);
-            selectAuxCommandBank(BoardPort.PortC, AuxCmdSlot.AuxCmd1, 0);
-            selectAuxCommandBank(BoardPort.PortD, AuxCmdSlot.AuxCmd1, 0);
-            selectAuxCommandBank(BoardPort.PortA, AuxCmdSlot.AuxCmd2, 0);
-            selectAuxCommandBank(BoardPort.PortB, AuxCmdSlot.AuxCmd2, 0);
-            selectAuxCommandBank(BoardPort.PortC, AuxCmdSlot.AuxCmd2, 0);
-            selectAuxCommandBank(BoardPort.PortD, AuxCmdSlot.AuxCmd2, 0);
-            selectAuxCommandBank(BoardPort.PortA, AuxCmdSlot.AuxCmd3, 0);
-            selectAuxCommandBank(BoardPort.PortB, AuxCmdSlot.AuxCmd3, 0);
-            selectAuxCommandBank(BoardPort.PortC, AuxCmdSlot.AuxCmd3, 0);
-            selectAuxCommandBank(BoardPort.PortD, AuxCmdSlot.AuxCmd3, 0);
-            selectAuxCommandLength(AuxCmdSlot.AuxCmd1, 0, 0);
-            selectAuxCommandLength(AuxCmdSlot.AuxCmd2, 0, 0);
-            selectAuxCommandLength(AuxCmdSlot.AuxCmd3, 0, 0);
-            setContinuousRunMode(true);
-            setMaxTimeStep(4294967295);  // 4294967295 == (2^32 - 1)
+            ResetBoard();
+            SetSampleRate(AmplifierSampleRate.SampleRate30000Hz);
+            SelectAuxCommandBank(BoardPort.PortA, AuxCmdSlot.AuxCmd1, 0);
+            SelectAuxCommandBank(BoardPort.PortB, AuxCmdSlot.AuxCmd1, 0);
+            SelectAuxCommandBank(BoardPort.PortC, AuxCmdSlot.AuxCmd1, 0);
+            SelectAuxCommandBank(BoardPort.PortD, AuxCmdSlot.AuxCmd1, 0);
+            SelectAuxCommandBank(BoardPort.PortA, AuxCmdSlot.AuxCmd2, 0);
+            SelectAuxCommandBank(BoardPort.PortB, AuxCmdSlot.AuxCmd2, 0);
+            SelectAuxCommandBank(BoardPort.PortC, AuxCmdSlot.AuxCmd2, 0);
+            SelectAuxCommandBank(BoardPort.PortD, AuxCmdSlot.AuxCmd2, 0);
+            SelectAuxCommandBank(BoardPort.PortA, AuxCmdSlot.AuxCmd3, 0);
+            SelectAuxCommandBank(BoardPort.PortB, AuxCmdSlot.AuxCmd3, 0);
+            SelectAuxCommandBank(BoardPort.PortC, AuxCmdSlot.AuxCmd3, 0);
+            SelectAuxCommandBank(BoardPort.PortD, AuxCmdSlot.AuxCmd3, 0);
+            SelectAuxCommandLength(AuxCmdSlot.AuxCmd1, 0, 0);
+            SelectAuxCommandLength(AuxCmdSlot.AuxCmd2, 0, 0);
+            SelectAuxCommandLength(AuxCmdSlot.AuxCmd3, 0, 0);
+            SetContinuousRunMode(true);
+            SetMaxTimeStep(4294967295);  // 4294967295 == (2^32 - 1)
 
-            setCableLengthFeet(BoardPort.PortA, 3.0);  // assume 3 ft cables
-            setCableLengthFeet(BoardPort.PortB, 3.0);
-            setCableLengthFeet(BoardPort.PortC, 3.0);
-            setCableLengthFeet(BoardPort.PortD, 3.0);
+            SetCableLengthFeet(BoardPort.PortA, 3.0);  // assume 3 ft cables
+            SetCableLengthFeet(BoardPort.PortB, 3.0);
+            SetCableLengthFeet(BoardPort.PortC, 3.0);
+            SetCableLengthFeet(BoardPort.PortD, 3.0);
 
-            clearDspSettle();
+            SetDspSettle(false);
 
-            setDataSource(0, BoardDataSource.PortA1);
-            setDataSource(1, BoardDataSource.PortB1);
-            setDataSource(2, BoardDataSource.PortC1);
-            setDataSource(3, BoardDataSource.PortD1);
-            setDataSource(4, BoardDataSource.PortA2);
-            setDataSource(5, BoardDataSource.PortB2);
-            setDataSource(6, BoardDataSource.PortC2);
-            setDataSource(7, BoardDataSource.PortD2);
+            SetDataSource(0, BoardDataSource.PortA1);
+            SetDataSource(1, BoardDataSource.PortB1);
+            SetDataSource(2, BoardDataSource.PortC1);
+            SetDataSource(3, BoardDataSource.PortD1);
+            SetDataSource(4, BoardDataSource.PortA2);
+            SetDataSource(5, BoardDataSource.PortB2);
+            SetDataSource(6, BoardDataSource.PortC2);
+            SetDataSource(7, BoardDataSource.PortD2);
 
-            enableDataStream(0);        // start with only one data stream enabled
+            EnableDataStream(0, true);        // start with only one data stream enabled
             for (i = 1; i < MAX_NUM_DATA_STREAMS; i++)
             {
-                disableDataStream(i);
+                EnableDataStream(i, false);
             }
 
-            clearTtlOut();
+            ClearTtlOut();
 
-            disableDac(0);
-            disableDac(1);
-            disableDac(2);
-            disableDac(3);
-            disableDac(4);
-            disableDac(5);
-            disableDac(6);
-            disableDac(7);
-            selectDacDataStream(0, 0);
-            selectDacDataStream(1, 0);
-            selectDacDataStream(2, 0);
-            selectDacDataStream(3, 0);
-            selectDacDataStream(4, 0);
-            selectDacDataStream(5, 0);
-            selectDacDataStream(6, 0);
-            selectDacDataStream(7, 0);
-            selectDacDataChannel(0, 0);
-            selectDacDataChannel(1, 0);
-            selectDacDataChannel(2, 0);
-            selectDacDataChannel(3, 0);
-            selectDacDataChannel(4, 0);
-            selectDacDataChannel(5, 0);
-            selectDacDataChannel(6, 0);
-            selectDacDataChannel(7, 0);
+            EnableDac(0, false);
+            EnableDac(1, false);
+            EnableDac(2, false);
+            EnableDac(3, false);
+            EnableDac(4, false);
+            EnableDac(5, false);
+            EnableDac(6, false);
+            EnableDac(7, false);
+            SelectDacDataStream(0, 0);
+            SelectDacDataStream(1, 0);
+            SelectDacDataStream(2, 0);
+            SelectDacDataStream(3, 0);
+            SelectDacDataStream(4, 0);
+            SelectDacDataStream(5, 0);
+            SelectDacDataStream(6, 0);
+            SelectDacDataStream(7, 0);
+            SelectDacDataChannel(0, 0);
+            SelectDacDataChannel(1, 0);
+            SelectDacDataChannel(2, 0);
+            SelectDacDataChannel(3, 0);
+            SelectDacDataChannel(4, 0);
+            SelectDacDataChannel(5, 0);
+            SelectDacDataChannel(6, 0);
+            SelectDacDataChannel(7, 0);
 
-            setDacManual(DacManual.DacManual1, 32768);    // midrange value = 0 V
-            setDacManual(DacManual.DacManual2, 32768);    // midrange value = 0 V
+            SetDacManual(DacManual.DacManual1, 32768);    // midrange value = 0 V
+            SetDacManual(DacManual.DacManual2, 32768);    // midrange value = 0 V
+
+            SetDacGain(0);
+            SetAudioNoiseSuppress(0);
         }
 
         // Set the per-channel sampling rate of the RHD2000 chips connected to the FPGA.
-        bool setSampleRate(AmplifierSampleRate newSampleRate)
+        public bool SetSampleRate(AmplifierSampleRate newSampleRate)
         {
             // Assuming a 100 MHz reference clock is provided to the FPGA, the programmable FPGA clock frequency
             // is given by:
@@ -348,7 +350,7 @@ namespace Rhythm.Net
             sampleRate = newSampleRate;
 
             // Wait for DcmProgDone = 1 before reprogramming clock synthesizer
-            while (isDcmProgDone() == false) { }
+            while (IsDcmProgDone() == false) { }
 
             // Reprogram clock synthesizer
             dev.SetWireInValue(OkEndPoint.WireInDataFreqPll, (uint)(256 * M + D));
@@ -356,13 +358,13 @@ namespace Rhythm.Net
             dev.ActivateTriggerIn(OkEndPoint.TrigInDcmProg, 0);
 
             // Wait for DataClkLocked = 1 before allowing data acquisition to continue
-            while (isDataClockLocked() == false) { }
+            while (IsDataClockLocked() == false) { }
 
             return (true);
         }
 
         // Returns the current per-channel sampling rate (in Hz) as a floating-point number.
-        double getSampleRate()
+        public double GetSampleRate()
         {
             switch (sampleRate)
             {
@@ -405,9 +407,14 @@ namespace Rhythm.Net
             }
         }
 
+        public AmplifierSampleRate GetSampleRateEnum()
+        {
+            return sampleRate;
+        }
+
         // Upload an auxiliary command list to a particular command slot (AuxCmd1, AuxCmd2, or AuxCmd3) and RAM bank (0-15)
         // on the FPGA.
-        void uploadCommandList(List<int> commandList, AuxCmdSlot auxCommandSlot, uint bank)
+        public void UploadCommandList(List<int> commandList, AuxCmdSlot auxCommandSlot, uint bank)
         {
             if (auxCommandSlot != AuxCmdSlot.AuxCmd1 && auxCommandSlot != AuxCmdSlot.AuxCmd2 && auxCommandSlot != AuxCmdSlot.AuxCmd3)
             {
@@ -441,7 +448,7 @@ namespace Rhythm.Net
         }
 
         // Print a command list to the console in readable form.
-        void printCommandList(List<int> commandList)
+        public void PrintCommandList(List<int> commandList)
         {
             int cmd, channel, reg, data;
 
@@ -487,7 +494,7 @@ namespace Rhythm.Net
 
         // Select an auxiliary command slot (AuxCmd1, AuxCmd2, or AuxCmd3) and bank (0-15) for a particular SPI port
         // (PortA, PortB, PortC, or PortD) on the FPGA.
-        void selectAuxCommandBank(BoardPort port, AuxCmdSlot auxCommandSlot, int bank)
+        public void SelectAuxCommandBank(BoardPort port, AuxCmdSlot auxCommandSlot, int bank)
         {
             int bitShift;
 
@@ -536,7 +543,7 @@ namespace Rhythm.Net
 
         // Specify a command sequence length (endIndex = 0-1023) and command loop index (0-1023) for a particular
         // auxiliary command slot (AuxCmd1, AuxCmd2, or AuxCmd3).
-        void selectAuxCommandLength(AuxCmdSlot auxCommandSlot, int loopIndex, int endIndex)
+        public void SelectAuxCommandLength(AuxCmdSlot auxCommandSlot, int loopIndex, int endIndex)
         {
             if (auxCommandSlot != AuxCmdSlot.AuxCmd1 && auxCommandSlot != AuxCmdSlot.AuxCmd2 && auxCommandSlot != AuxCmdSlot.AuxCmd3)
             {
@@ -573,7 +580,7 @@ namespace Rhythm.Net
 
         // Reset FPGA.  This clears all auxiliary command RAM banks, clears the USB FIFO, and resets the
         // per-channel sampling rate to 30.0 kS/s/ch.
-        void resetBoard()
+        public void ResetBoard()
         {
             dev.SetWireInValue(OkEndPoint.WireInResetRun, 0x01, 0x01);
             dev.UpdateWireIns();
@@ -583,7 +590,7 @@ namespace Rhythm.Net
 
         // Set the FPGA to run continuously once started (if continuousMode == true) or to run until
         // maxTimeStep is reached (if continuousMode == false).
-        void setContinuousRunMode(bool continuousMode)
+        public void SetContinuousRunMode(bool continuousMode)
         {
             if (continuousMode)
             {
@@ -598,7 +605,7 @@ namespace Rhythm.Net
         }
 
         // Set maxTimeStep for cases where continuousMode == false.
-        void setMaxTimeStep(uint maxTimeStep)
+        public void SetMaxTimeStep(uint maxTimeStep)
         {
             uint maxTimeStepLsb, maxTimeStepMsb;
 
@@ -611,13 +618,13 @@ namespace Rhythm.Net
         }
 
         // Initiate SPI data acquisition.
-        void run()
+        public void Run()
         {
             dev.ActivateTriggerIn(OkEndPoint.TrigInSpiStart, 0);
         }
 
         // Is the FPGA currently running?
-        bool isRunning()
+        public bool IsRunning()
         {
             uint value;
 
@@ -636,17 +643,25 @@ namespace Rhythm.Net
 
         // Returns the number of 16-bit words in the USB FIFO.  The user should never attempt to read
         // more data than the FIFO currently contains, as it is not protected against underflow.
-        uint numWordsInFifo()
+        public uint NumWordsInFifo()
         {
             dev.UpdateWireOuts();
             return (dev.GetWireOutValue(OkEndPoint.WireOutNumWordsMsb) << 16) + dev.GetWireOutValue(OkEndPoint.WireOutNumWordsLsb);
+        }
+
+        // Returns the number of 16-bit words the USB SDRAM FIFO can hold.  The FIFO can actually hold a few
+        // thousand words more than the number returned by this method due to FPGA "mini-FIFOs" interfacing
+        // with the SDRAM, but this provides a conservative estimate of FIFO capacity.
+        public uint FifoCapacityInWords()
+        {
+            return FIFO_CAPACITY_WORDS;
         }
 
         // Set the delay for sampling the MISO line on a particular SPI port (PortA - PortD), in integer clock
         // steps, where each clock step is 1/2800 of a per-channel sampling period.
         // Note: Cable delay must be updated after sampleRate is changed, since cable delay calculations are
         // based on the clock frequency!
-        void setCableDelay(BoardPort port, int delay)
+        public void SetCableDelay(BoardPort port, int delay)
         {
             int bitShift;
 
@@ -681,7 +696,7 @@ namespace Rhythm.Net
         // of the cable between the FPGA and the RHD2000 chip (in meters).
         // Note: Cable delay must be updated after sampleRate is changed, since cable delay calculations are
         // based on the clock frequency!
-        void setCableLengthMeters(BoardPort port, double lengthInMeters)
+        public void SetCableLengthMeters(BoardPort port, double lengthInMeters)
         {
             int delay;
             double tStep, cableVelocity, distance, timeDelay;
@@ -691,7 +706,7 @@ namespace Rhythm.Net
             const double rhd2000Delay = 9.0e-9;             // 9.0 ns RHD2000 SCLK-to-MISO delay
             const double misoSettleTime = 10.0e-9;          // 10.0 ns delay after MISO changes, before we sample it
 
-            tStep = 1.0 / (2800.0 * getSampleRate());  // data clock that samples MISO has a rate 35 x 80 = 2800x higher than the sampling rate
+            tStep = 1.0 / (2800.0 * GetSampleRate());  // data clock that samples MISO has a rate 35 x 80 = 2800x higher than the sampling rate
             cableVelocity = 0.67 * speedOfLight;  // propogation velocity on cable is rougly 2/3 the speed of light
             distance = 2.0 * lengthInMeters;      // round trip distance data must travel on cable
             timeDelay = distance / cableVelocity + xilinxLvdsOutputDelay + rhd2000Delay + xilinxLvdsInputDelay + misoSettleTime;
@@ -701,32 +716,52 @@ namespace Rhythm.Net
             // cout << "Total delay = " << (1e9 * timeDelay) << " ns" << endl;
             // cout << "setCableLength: setting delay to " << delay << endl;
 
-            setCableDelay(port, delay);
+            if (delay < 1) delay = 1;   // delay of zero is too short (due to I/O delays), even for zero-length cables
+
+            SetCableDelay(port, delay);
         }
 
         // Same function as above, but accepts lengths in feet instead of meters
-        void setCableLengthFeet(BoardPort port, double lengthInFeet)
+        public void SetCableLengthFeet(BoardPort port, double lengthInFeet)
         {
-            setCableLengthMeters(port, 0.03048 * lengthInFeet);   // convert feet to meters
+            SetCableLengthMeters(port, 0.03048 * lengthInFeet);   // convert feet to meters
         }
 
-        // Turn on DSP settle function in the FPGA.  (Only executes when CONVERT commands are sent.)
-        void setDspSettle()
+        // Estimate cable length based on a particular delay used in setCableDelay.
+        // (Note: Depends on sample rate.)
+        public double EstimateCableLengthMeters(int delay)
         {
-            dev.SetWireInValue(OkEndPoint.WireInResetRun, 0x04, 0x04);
-            dev.UpdateWireIns();
+            double tStep, cableVelocity, distance;
+            const double speedOfLight = 299792458.0;  // units = meters per second
+            const double xilinxLvdsOutputDelay = 1.9e-9;    // 1.9 ns Xilinx LVDS output pin delay
+            const double xilinxLvdsInputDelay = 1.4e-9;     // 1.4 ns Xilinx LVDS input pin delay
+            const double rhd2000Delay = 9.0e-9;             // 9.0 ns RHD2000 SCLK-to-MISO delay
+
+            tStep = 1.0 / (2800.0 * GetSampleRate());  // data clock that samples MISO has a rate 35 x 80 = 2800x higher than the sampling rate
+            cableVelocity = 0.67 * speedOfLight;  // propogation velocity on cable is rougly 2/3 the speed of light
+
+            distance = cableVelocity * (delay * tStep - (xilinxLvdsOutputDelay + rhd2000Delay + xilinxLvdsInputDelay));
+            if (distance < 0.0) distance = 0.0;
+
+            return (distance / 2.0);
         }
 
-        // Turn off DSP settle function in the FPGA.
-        void clearDspSettle()
+        // Same function as above, but returns length in feet instead of meters
+        public double EstimateCableLengthFeet(int delay)
         {
-            dev.SetWireInValue(OkEndPoint.WireInResetRun, 0x00, 0x04);
+            return 3.2808 * EstimateCableLengthMeters(delay);
+        }
+
+        // Turn on or off DSP settle function in the FPGA.  (Only executes when CONVERT commands are sent.)
+        public void SetDspSettle(bool enabled)
+        {
+            dev.SetWireInValue(OkEndPoint.WireInResetRun, (uint)(enabled ? 0x04 : 0x00), 0x04);
             dev.UpdateWireIns();
         }
 
         // Assign a particular data source (e.g., PortA1, PortA2, PortB1,...) to one of the eight
         // available USB data streams (0-7).
-        void setDataSource(int stream, BoardDataSource dataSource)
+        public void SetDataSource(int stream, BoardDataSource dataSource)
         {
             int bitShift;
             int endPoint;
@@ -773,55 +808,51 @@ namespace Rhythm.Net
             dev.UpdateWireIns();
         }
 
-        // Disable one of the eight available USB data streams (0-7) to reduce USB and FIFO usage.
-        void disableDataStream(int stream)
+        // Enable or disable one of the eight available USB data streams (0-7).
+        public void EnableDataStream(int stream, bool enabled)
         {
             if (stream < 0 || stream > (MAX_NUM_DATA_STREAMS - 1))
             {
                 throw new ArgumentException("stream out of range.", "stream");
             }
 
-            if (dataStreamEnabled[stream] == 1)
+            if (enabled)
             {
-                dev.SetWireInValue(OkEndPoint.WireInDataStreamEn, (uint)(0x0000 << stream), (uint)(0xfff0 | (0x0001 << stream)));
-                dev.UpdateWireIns();
-                dataStreamEnabled[stream] = 0;
-                numDataStreams--;
+                if (dataStreamEnabled[stream] == 0)
+                {
+                    dev.SetWireInValue(OkEndPoint.WireInDataStreamEn, (uint)(0x0001 << stream), (uint)(0xfff0 | (0x0001 << stream)));
+                    dev.UpdateWireIns();
+                    dataStreamEnabled[stream] = 1;
+                    ++numDataStreams;
+                }
             }
-        }
-
-        // Enable one of the eight available USB data streams (0-7).
-        void enableDataStream(int stream)
-        {
-            if (stream < 0 || stream > (MAX_NUM_DATA_STREAMS - 1))
+            else
             {
-                throw new ArgumentException("stream out of range.", "stream");
-            }
-
-            if (dataStreamEnabled[stream] == 0)
-            {
-                dev.SetWireInValue(OkEndPoint.WireInDataStreamEn, (uint)(0x0001 << stream), (uint)(0xfff0 | (0x0001 << stream)));
-                dev.UpdateWireIns();
-                dataStreamEnabled[stream] = 1;
-                ++numDataStreams;
+                if (dataStreamEnabled[stream] == 1)
+                {
+                    dev.SetWireInValue(OkEndPoint.WireInDataStreamEn, (uint)(0x0000 << stream), (uint)(0xfff0 | (0x0001 << stream)));
+                    dev.UpdateWireIns();
+                    dataStreamEnabled[stream] = 0;
+                    numDataStreams--;
+                }
             }
         }
 
         // Returns the number of enabled data streams.
-        int getNumEnabledDataStreams()
+        public int GetNumEnabledDataStreams()
         {
             return numDataStreams;
         }
 
         // Set all 16 bits of the digital TTL output lines on the FPGA to zero.
-        void clearTtlOut()
+        public void ClearTtlOut()
         {
             dev.SetWireInValue(OkEndPoint.WireInTtlOut, 0x0000);
             dev.UpdateWireIns();
         }
 
         // Set the 16 bits of the digital TTL output lines on the FPGA high or low according to integer array.
-        void setTtlOut(int[] ttlOutArray)
+        public void SetTtlOut(int[] ttlOutArray)
         {
             int i, ttlOut;
 
@@ -836,7 +867,7 @@ namespace Rhythm.Net
         }
 
         // Read the 16 bits of the digital TTL input lines on the FPGA into an integer array.
-        void getTtlIn(int[] ttlInArray)
+        public void GetTtlIn(int[] ttlInArray)
         {
             int i, ttlIn;
 
@@ -851,7 +882,7 @@ namespace Rhythm.Net
             }
         }
 
-        void setDacManual(DacManual dac, int value)
+        public void SetDacManual(DacManual dac, int value)
         {
             if (value < 0 || value > 65535)
             {
@@ -871,7 +902,7 @@ namespace Rhythm.Net
         }
 
         // Set the eight red LEDs on the XEM6010 board according to integer array.
-        void setLedDisplay(int[] ledArray)
+        public void SetLedDisplay(int[] ledArray)
         {
             int i, ledOut;
 
@@ -885,8 +916,8 @@ namespace Rhythm.Net
             dev.UpdateWireIns();
         }
 
-        // Enable AD5662 DAC channel (0-7)
-        void enableDac(int dacChannel)
+        // Enable or disable AD5662 DAC channel (0-7)
+        public void EnableDac(int dacChannel, bool enabled)
         {
             if (dacChannel < 0 || dacChannel > 7)
             {
@@ -896,73 +927,60 @@ namespace Rhythm.Net
             switch (dacChannel)
             {
                 case 0:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource1, 0x0200, 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource1, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
                     break;
                 case 1:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource2, 0x0200, 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource2, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
                     break;
                 case 2:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource3, 0x0200, 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource3, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
                     break;
                 case 3:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource4, 0x0200, 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource4, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
                     break;
                 case 4:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource5, 0x0200, 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource5, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
                     break;
                 case 5:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource6, 0x0200, 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource6, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
                     break;
                 case 6:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource7, 0x0200, 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource7, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
                     break;
                 case 7:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource8, 0x0200, 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource8, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
                     break;
             }
             dev.UpdateWireIns();
         }
 
-        // Disable AD5662 DAC channel (0-7)
-        void disableDac(int dacChannel)
+        // Set the gain level of all eight DAC channels to 2^gain (gain = 0-7).
+        public void SetDacGain(int gain)
         {
-            if (dacChannel < 0 || dacChannel > 7)
+            if (gain < 0 || gain > 7)
             {
-                throw new ArgumentException("dacChannel out of range.", "dacChannel");
+                throw new ArgumentException("gain out of range.", "gain");
             }
 
-            switch (dacChannel)
+            dev.SetWireInValue(OkEndPoint.WireInResetRun, (uint)(gain << 13), 0xe000);
+            dev.UpdateWireIns();
+        }
+
+        // Suppress the noise on DAC channels 0 and 1 (the audio channels) between
+        // +16*noiseSuppress and -16*noiseSuppress LSBs.  (noiseSuppress = 0-127).
+        public void SetAudioNoiseSuppress(int noiseSuppress)
+        {
+            if (noiseSuppress < 0 || noiseSuppress > 127)
             {
-                case 0:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource1, 0x0000, 0x0200);
-                    break;
-                case 1:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource2, 0x0000, 0x0200);
-                    break;
-                case 2:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource3, 0x0000, 0x0200);
-                    break;
-                case 3:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource4, 0x0000, 0x0200);
-                    break;
-                case 4:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource5, 0x0000, 0x0200);
-                    break;
-                case 5:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource6, 0x0000, 0x0200);
-                    break;
-                case 6:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource7, 0x0000, 0x0200);
-                    break;
-                case 7:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource8, 0x0000, 0x0200);
-                    break;
+                throw new ArgumentException("noiseSuppress out of range.", "noiseSuppress");
             }
+
+            dev.SetWireInValue(OkEndPoint.WireInResetRun, (uint)(noiseSuppress << 6), 0x1fc0);
             dev.UpdateWireIns();
         }
 
         // Assign a particular data stream (0-7) to a DAC channel (0-7).
-        void selectDacDataStream(int dacChannel, int stream)
+        public void SelectDacDataStream(int dacChannel, int stream)
         {
             if (dacChannel < 0 || dacChannel > 7)
             {
@@ -1005,7 +1023,7 @@ namespace Rhythm.Net
         }
 
         // Assign a particular amplifier channel (0-31) to a DAC channel (0-7).
-        void selectDacDataChannel(int dacChannel, int dataChannel)
+        public void SelectDacDataChannel(int dacChannel, int dataChannel)
         {
             if (dacChannel < 0 || dacChannel > 7)
             {
@@ -1049,45 +1067,45 @@ namespace Rhythm.Net
 
         // Flush all remaining data out of the FIFO.  (This function should only be called when SPI
         // data acquisition has been stopped.)
-        void flush()
+        public void Flush()
         {
-            while (numWordsInFifo() >= USB_BUFFER_SIZE / 2)
+            while (NumWordsInFifo() >= USB_BUFFER_SIZE / 2)
             {
                 dev.ReadFromPipeOut(OkEndPoint.PipeOutData, USB_BUFFER_SIZE, usbBuffer);
             }
-            while (numWordsInFifo() > 0)
+            while (NumWordsInFifo() > 0)
             {
-                dev.ReadFromPipeOut(OkEndPoint.PipeOutData, (int)(2 * numWordsInFifo()), usbBuffer);
+                dev.ReadFromPipeOut(OkEndPoint.PipeOutData, (int)(2 * NumWordsInFifo()), usbBuffer);
             }
         }
 
         // Read data block from the USB interface, if one is available.  Returns true if data block
         // was available.
-        bool readDataBlock(Rhd2000DataBlock dataBlock)
+        public bool ReadDataBlock(Rhd2000DataBlock dataBlock)
         {
             int numBytesToRead;
 
-            numBytesToRead = 2 * Rhd2000DataBlock.calculateDataBlockSizeInWords(numDataStreams);
+            numBytesToRead = 2 * Rhd2000DataBlock.CalculateDataBlockSizeInWords(numDataStreams);
             if (numBytesToRead > USB_BUFFER_SIZE)
             {
                 throw new InvalidOperationException("USB buffer size exceeded. Increase value of USB_BUFFER_SIZE.");
             }
 
             dev.ReadFromPipeOut(OkEndPoint.PipeOutData, numBytesToRead, usbBuffer);
-            dataBlock.fillFromUsbBuffer(usbBuffer, 0, numDataStreams);
+            dataBlock.FillFromUsbBuffer(usbBuffer, 0, numDataStreams);
             return true;
         }
 
         // Reads a certain number of USB data blocks, if the specified number is available, and appends them
         // to queue.  Returns true if data blocks were available.
-        bool readDataBlocks(int numBlocks, Queue<Rhd2000DataBlock> dataQueue)
+        public bool ReadDataBlocks(int numBlocks, Queue<Rhd2000DataBlock> dataQueue)
         {
             int numWordsToRead, numBytesToRead;
             int i;
             Rhd2000DataBlock dataBlock;
 
-            numWordsToRead = numBlocks * Rhd2000DataBlock.calculateDataBlockSizeInWords(numDataStreams);
-            if (numWordsInFifo() < numWordsToRead)
+            numWordsToRead = numBlocks * Rhd2000DataBlock.CalculateDataBlockSizeInWords(numDataStreams);
+            if (NumWordsInFifo() < numWordsToRead)
             {
                 return false;
             }
@@ -1102,7 +1120,7 @@ namespace Rhythm.Net
             for (i = 0; i < numBlocks; ++i)
             {
                 dataBlock = new Rhd2000DataBlock(numDataStreams);
-                dataBlock.fillFromUsbBuffer(usbBuffer, i, numDataStreams);
+                dataBlock.FillFromUsbBuffer(usbBuffer, i, numDataStreams);
                 dataQueue.Enqueue(dataBlock);
             }
 
@@ -1111,13 +1129,13 @@ namespace Rhythm.Net
 
         // Writes the contents of a data block queue (dataQueue) to a binary output stream (saveOut).
         // Returns the number of data blocks written.
-        int queueToFile(Queue<Rhd2000DataBlock> dataQueue, Stream saveOut)
+        public int QueueToFile(Queue<Rhd2000DataBlock> dataQueue, Stream saveOut)
         {
             int count = 0;
 
             while (dataQueue.Count > 0)
             {
-                dataQueue.Peek().write(saveOut, getNumEnabledDataStreams());
+                dataQueue.Peek().Write(saveOut, GetNumEnabledDataStreams());
                 dataQueue.Dequeue();
                 ++count;
             }
@@ -1126,7 +1144,7 @@ namespace Rhythm.Net
         }
 
         // Return name of Opal Kelly board based on model code.
-        string opalKellyModelName(okEProduct model)
+        string OpalKellyModelName(okEProduct model)
         {
             switch (model)
             {
@@ -1191,7 +1209,7 @@ namespace Rhythm.Net
 
         // Reads system clock frequency from Opal Kelly board (in MHz).  Should be 100 MHz for normal
         // Rhythm operation.
-        double getSystemClockFreq()
+        double GetSystemClockFreq()
         {
             // Read back the CY22393 PLL configuation
             okCPLL22393 pll = new okCPLL22393();
@@ -1201,7 +1219,7 @@ namespace Rhythm.Net
         }
 
         // Is variable-frequency clock DCM programming done?
-        bool isDcmProgDone()
+        bool IsDcmProgDone()
         {
             uint value;
 
@@ -1212,7 +1230,7 @@ namespace Rhythm.Net
         }
 
         // Is variable-frequency clock PLL locked?
-        bool isDataClockLocked()
+        bool IsDataClockLocked()
         {
             uint value;
 

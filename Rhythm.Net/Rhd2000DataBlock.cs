@@ -11,7 +11,7 @@ namespace Rhythm.Net
         const int SAMPLES_PER_DATA_BLOCK = 60;
         const ulong RHD2000_HEADER_MAGIC_NUMBER = 0xc691199927021942;
 
-        int[] timeStamp;
+        uint[] timeStamp;
         int[][][] amplifierData;
         int[][][] auxiliaryData;
         int[][] boardAdcData;
@@ -20,35 +20,41 @@ namespace Rhythm.Net
 
         public Rhd2000DataBlock(int numDataStreams)
         {
-            allocateIntArray1D(ref timeStamp, SAMPLES_PER_DATA_BLOCK);
-            allocateIntArray3D(ref amplifierData, numDataStreams, 32, SAMPLES_PER_DATA_BLOCK);
-            allocateIntArray3D(ref auxiliaryData, numDataStreams, 3, SAMPLES_PER_DATA_BLOCK);
-            allocateIntArray2D(ref boardAdcData, 8, SAMPLES_PER_DATA_BLOCK);
-            allocateIntArray1D(ref ttlIn, SAMPLES_PER_DATA_BLOCK);
-            allocateIntArray1D(ref ttlOut, SAMPLES_PER_DATA_BLOCK);
+            AllocateUIntArray1D(ref timeStamp, SAMPLES_PER_DATA_BLOCK);
+            AllocateIntArray3D(ref amplifierData, numDataStreams, 32, SAMPLES_PER_DATA_BLOCK);
+            AllocateIntArray3D(ref auxiliaryData, numDataStreams, 3, SAMPLES_PER_DATA_BLOCK);
+            AllocateIntArray2D(ref boardAdcData, 8, SAMPLES_PER_DATA_BLOCK);
+            AllocateIntArray1D(ref ttlIn, SAMPLES_PER_DATA_BLOCK);
+            AllocateIntArray1D(ref ttlOut, SAMPLES_PER_DATA_BLOCK);
         }
 
         // Returns the number of 16-bit words in a USB data block with numDataStreams data streams enabled.
-        public static int calculateDataBlockSizeInWords(int numDataStreams)
+        public static int CalculateDataBlockSizeInWords(int numDataStreams)
         {
             return SAMPLES_PER_DATA_BLOCK * (4 + 2 + numDataStreams * 36 + 8 + 2);
             // 4 = magic number; 2 = time stamp; 36 = (32 amp channels + 3 aux commands + 1 filler word); 8 = ADCs; 2 = TTL in/out
         }
 
+        // Returns the number of samples in a USB data block.
+        public static uint GetSamplesPerDataBlock()
+        {
+            return SAMPLES_PER_DATA_BLOCK;
+        }
+
         // Fill data block with raw data from USB input buffer.
-        public void fillFromUsbBuffer(byte[] usbBuffer, int blockIndex, int numDataStreams)
+        public void FillFromUsbBuffer(byte[] usbBuffer, int blockIndex, int numDataStreams)
         {
             int index, t, channel, stream, i;
 
-            index = blockIndex * 2 * calculateDataBlockSizeInWords(numDataStreams);
+            index = blockIndex * 2 * CalculateDataBlockSizeInWords(numDataStreams);
             for (t = 0; t < SAMPLES_PER_DATA_BLOCK; ++t)
             {
-                if (!checkUsbHeader(usbBuffer, index))
+                if (!CheckUsbHeader(usbBuffer, index))
                 {
                     throw new ArgumentException("Incorrect header.", "usbBuffer");
                 }
                 index += 8;
-                timeStamp[t] = (int)convertUsbTimeStamp(usbBuffer, index);
+                timeStamp[t] = ConvertUsbTimeStamp(usbBuffer, index);
                 index += 4;
 
                 // Read auxiliary results
@@ -56,7 +62,7 @@ namespace Rhythm.Net
                 {
                     for (stream = 0; stream < numDataStreams; ++stream)
                     {
-                        auxiliaryData[stream][channel][t] = convertUsbWord(usbBuffer, index);
+                        auxiliaryData[stream][channel][t] = ConvertUsbWord(usbBuffer, index);
                         index += 2;
                     }
                 }
@@ -66,7 +72,7 @@ namespace Rhythm.Net
                 {
                     for (stream = 0; stream < numDataStreams; ++stream)
                     {
-                        amplifierData[stream][channel][t] = convertUsbWord(usbBuffer, index);
+                        amplifierData[stream][channel][t] = ConvertUsbWord(usbBuffer, index);
                         index += 2;
                     }
                 }
@@ -77,22 +83,22 @@ namespace Rhythm.Net
                 // Read from AD5662 ADCs
                 for (i = 0; i < 8; ++i)
                 {
-                    boardAdcData[i][t] = convertUsbWord(usbBuffer, index);
+                    boardAdcData[i][t] = ConvertUsbWord(usbBuffer, index);
                     index += 2;
                 }
 
                 // Read TTL input and output values
-                ttlIn[t] = convertUsbWord(usbBuffer, index);
+                ttlIn[t] = ConvertUsbWord(usbBuffer, index);
                 index += 2;
 
-                ttlOut[t] = convertUsbWord(usbBuffer, index);
+                ttlOut[t] = ConvertUsbWord(usbBuffer, index);
                 index += 2;
             }
         }
 
         // Print the contents of RHD2000 registers from a selected USB data stream (0-7)
         // to the console.
-        public void print(int stream)
+        public void Print(int stream)
         {
             const int RamOffset = 37;
 
@@ -240,38 +246,38 @@ namespace Rhythm.Net
         }
 
         // Write contents of data block to a binary output stream (saveOut) in little endian format.
-        public void write(Stream saveOut, int numDataStreams)
+        public void Write(Stream saveOut, int numDataStreams)
         {
             int t, channel, stream, i;
 
             for (t = 0; t < SAMPLES_PER_DATA_BLOCK; ++t)
             {
-                writeWordLittleEndian(saveOut, timeStamp[t]);
+                WriteWordLittleEndian(saveOut, (int)timeStamp[t]);
                 for (channel = 0; channel < 32; ++channel)
                 {
                     for (stream = 0; stream < numDataStreams; ++stream)
                     {
-                        writeWordLittleEndian(saveOut, amplifierData[stream][channel][t]);
+                        WriteWordLittleEndian(saveOut, amplifierData[stream][channel][t]);
                     }
                 }
                 for (channel = 0; channel < 3; ++channel)
                 {
                     for (stream = 0; stream < numDataStreams; ++stream)
                     {
-                        writeWordLittleEndian(saveOut, auxiliaryData[stream][channel][t]);
+                        WriteWordLittleEndian(saveOut, auxiliaryData[stream][channel][t]);
                     }
                 }
                 for (i = 0; i < 8; ++i)
                 {
-                    writeWordLittleEndian(saveOut, boardAdcData[i][t]);
+                    WriteWordLittleEndian(saveOut, boardAdcData[i][t]);
                 }
-                writeWordLittleEndian(saveOut, ttlIn[t]);
-                writeWordLittleEndian(saveOut, ttlOut[t]);
+                WriteWordLittleEndian(saveOut, ttlIn[t]);
+                WriteWordLittleEndian(saveOut, ttlOut[t]);
             }
         }
 
         // Allocates memory for a 3-D array of integers.
-        void allocateIntArray3D(ref int[][][] array3D, int xSize, int ySize, int zSize)
+        void AllocateIntArray3D(ref int[][][] array3D, int xSize, int ySize, int zSize)
         {
             int i, j;
 
@@ -288,7 +294,7 @@ namespace Rhythm.Net
         }
 
         // Allocates memory for a 2-D array of integers.
-        void allocateIntArray2D(ref int[][] array2D, int xSize, int ySize)
+        void AllocateIntArray2D(ref int[][] array2D, int xSize, int ySize)
         {
             int i;
 
@@ -298,7 +304,13 @@ namespace Rhythm.Net
         }
 
         // Allocates memory for a 1-D array of integers.
-        void allocateIntArray1D(ref int[] array1D, int xSize)
+        void AllocateIntArray1D(ref int[] array1D, int xSize)
+        {
+            Array.Resize(ref array1D, xSize);
+        }
+
+        // Allocates memory for a 1-D array of unsigned integers.
+        void AllocateUIntArray1D(ref uint[] array1D, int xSize)
         {
             Array.Resize(ref array1D, xSize);
         }
@@ -309,7 +321,7 @@ namespace Rhythm.Net
         // the processor running the operating system.
         //
         // (See "Endianness" article in Wikipedia for more information.)
-        void writeWordLittleEndian(Stream outputStream, int dataWord)
+        void WriteWordLittleEndian(Stream outputStream, int dataWord)
         {
             byte msb, lsb;
 
@@ -321,7 +333,7 @@ namespace Rhythm.Net
         }
 
         // Check first 64 bits of USB header against the fixed Rhythm "magic number" to verify data sync.
-        bool checkUsbHeader(byte[] usbBuffer, int index)
+        bool CheckUsbHeader(byte[] usbBuffer, int index)
         {
             ulong x1, x2, x3, x4, x5, x6, x7, x8;
             ulong header;
@@ -340,7 +352,7 @@ namespace Rhythm.Net
         }
 
         // Read 32-bit time stamp from USB data frame.
-        uint convertUsbTimeStamp(byte[] usbBuffer, int index)
+        uint ConvertUsbTimeStamp(byte[] usbBuffer, int index)
         {
             uint x1, x2, x3, x4;
             x1 = usbBuffer[index];
@@ -352,7 +364,7 @@ namespace Rhythm.Net
         }
 
         // Convert two USB bytes into 16-bit word.
-        int convertUsbWord(byte[] usbBuffer, int index)
+        int ConvertUsbWord(byte[] usbBuffer, int index)
         {
             uint x1, x2, result;
 
