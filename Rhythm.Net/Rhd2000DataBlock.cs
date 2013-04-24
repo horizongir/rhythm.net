@@ -12,9 +12,9 @@ namespace Rhythm.Net
         const ulong RHD2000_HEADER_MAGIC_NUMBER = 0xc691199927021942;
 
         uint[] timeStamp;
-        int[][][] amplifierData;
-        int[][][] auxiliaryData;
-        int[][] boardAdcData;
+        int[][,] amplifierData;
+        int[][,] auxiliaryData;
+        int[,] boardAdcData;
         int[] ttlIn;
         int[] ttlOut;
 
@@ -26,6 +26,36 @@ namespace Rhythm.Net
             AllocateIntArray2D(ref boardAdcData, 8, SAMPLES_PER_DATA_BLOCK);
             AllocateIntArray1D(ref ttlIn, SAMPLES_PER_DATA_BLOCK);
             AllocateIntArray1D(ref ttlOut, SAMPLES_PER_DATA_BLOCK);
+        }
+
+        public uint[] Timestamp
+        {
+            get { return timeStamp; }
+        }
+
+        public int[][,] AmplifierData
+        {
+            get { return amplifierData; }
+        }
+
+        public int[][,] AuxiliaryData
+        {
+            get { return auxiliaryData; }
+        }
+
+        public int[,] BoardAdcData
+        {
+            get { return boardAdcData; }
+        }
+
+        public int[] TtlIn
+        {
+            get { return ttlIn; }
+        }
+
+        public int[] TtlOut
+        {
+            get { return ttlOut; }
         }
 
         // Returns the number of 16-bit words in a USB data block with numDataStreams data streams enabled.
@@ -62,7 +92,7 @@ namespace Rhythm.Net
                 {
                     for (stream = 0; stream < numDataStreams; ++stream)
                     {
-                        auxiliaryData[stream][channel][t] = ConvertUsbWord(usbBuffer, index);
+                        auxiliaryData[stream][channel, t] = ConvertUsbWord(usbBuffer, index);
                         index += 2;
                     }
                 }
@@ -72,7 +102,7 @@ namespace Rhythm.Net
                 {
                     for (stream = 0; stream < numDataStreams; ++stream)
                     {
-                        amplifierData[stream][channel][t] = ConvertUsbWord(usbBuffer, index);
+                        amplifierData[stream][channel, t] = ConvertUsbWord(usbBuffer, index);
                         index += 2;
                     }
                 }
@@ -83,7 +113,7 @@ namespace Rhythm.Net
                 // Read from AD5662 ADCs
                 for (i = 0; i < 8; ++i)
                 {
-                    boardAdcData[i][t] = ConvertUsbWord(usbBuffer, index);
+                    boardAdcData[i, t] = ConvertUsbWord(usbBuffer, index);
                     index += 2;
                 }
 
@@ -106,24 +136,24 @@ namespace Rhythm.Net
             Console.WriteLine("RHD 2000 Data Block contents:");
             Console.WriteLine("  ROM contents:");
             Console.WriteLine("    Chip Name: " +
-                   (char)auxiliaryData[stream][2][24] +
-                   (char)auxiliaryData[stream][2][25] +
-                   (char)auxiliaryData[stream][2][26] +
-                   (char)auxiliaryData[stream][2][27] +
-                   (char)auxiliaryData[stream][2][28] +
-                   (char)auxiliaryData[stream][2][29] +
-                   (char)auxiliaryData[stream][2][30] +
-                   (char)auxiliaryData[stream][2][31]);
+                   (char)auxiliaryData[stream][2, 24] +
+                   (char)auxiliaryData[stream][2, 25] +
+                   (char)auxiliaryData[stream][2, 26] +
+                   (char)auxiliaryData[stream][2, 27] +
+                   (char)auxiliaryData[stream][2, 28] +
+                   (char)auxiliaryData[stream][2, 29] +
+                   (char)auxiliaryData[stream][2, 30] +
+                   (char)auxiliaryData[stream][2, 31]);
             Console.WriteLine("    Company Name:" +
-                   (char)auxiliaryData[stream][2][32] +
-                   (char)auxiliaryData[stream][2][33] +
-                   (char)auxiliaryData[stream][2][34] +
-                   (char)auxiliaryData[stream][2][35] +
-                   (char)auxiliaryData[stream][2][36]);
-            Console.WriteLine("    Intan Chip ID: " + auxiliaryData[stream][2][19]);
-            Console.WriteLine("    Number of Amps: " + auxiliaryData[stream][2][20]);
+                   (char)auxiliaryData[stream][2, 32] +
+                   (char)auxiliaryData[stream][2, 33] +
+                   (char)auxiliaryData[stream][2, 34] +
+                   (char)auxiliaryData[stream][2, 35] +
+                   (char)auxiliaryData[stream][2, 36]);
+            Console.WriteLine("    Intan Chip ID: " + auxiliaryData[stream][2, 19]);
+            Console.WriteLine("    Number of Amps: " + auxiliaryData[stream][2, 20]);
             Console.Write("    Unipolar/Bipolar Amps: ");
-            switch (auxiliaryData[stream][2][21])
+            switch (auxiliaryData[stream][2, 21])
             {
                 case 0:
                     Console.Write("bipolar");
@@ -136,51 +166,51 @@ namespace Rhythm.Net
                     break;
             }
             Console.WriteLine();
-            Console.WriteLine("    Die Revision: " + auxiliaryData[stream][2][22]);
-            Console.WriteLine("    Future Expansion Register: " + auxiliaryData[stream][2][23]);
+            Console.WriteLine("    Die Revision: " + auxiliaryData[stream][2, 22]);
+            Console.WriteLine("    Future Expansion Register: " + auxiliaryData[stream][2, 23]);
 
             Console.WriteLine("  RAM contents:");
-            Console.WriteLine("    ADC reference BW:      " + ((auxiliaryData[stream][2][RamOffset + 0] & 0xc0) >> 6));
-            Console.WriteLine("    amp fast settle:       " + ((auxiliaryData[stream][2][RamOffset + 0] & 0x20) >> 5));
-            Console.WriteLine("    amp Vref enable:       " + ((auxiliaryData[stream][2][RamOffset + 0] & 0x10) >> 4));
-            Console.WriteLine("    ADC comparator bias:   " + ((auxiliaryData[stream][2][RamOffset + 0] & 0x0c) >> 2));
-            Console.WriteLine("    ADC comparator select: " + ((auxiliaryData[stream][2][RamOffset + 0] & 0x03) >> 0));
-            Console.WriteLine("    VDD sense enable:      " + ((auxiliaryData[stream][2][RamOffset + 1] & 0x40) >> 6));
-            Console.WriteLine("    ADC buffer bias:       " + ((auxiliaryData[stream][2][RamOffset + 1] & 0x3f) >> 0));
-            Console.WriteLine("    MUX bias:              " + ((auxiliaryData[stream][2][RamOffset + 2] & 0x3f) >> 0));
-            Console.WriteLine("    MUX load:              " + ((auxiliaryData[stream][2][RamOffset + 3] & 0xe0) >> 5));
-            Console.WriteLine("    tempS2, tempS1:        " + ((auxiliaryData[stream][2][RamOffset + 3] & 0x10) >> 4) + "," +
-                   ((auxiliaryData[stream][2][RamOffset + 3] & 0x08) >> 3));
-            Console.WriteLine("    tempen:                " + ((auxiliaryData[stream][2][RamOffset + 3] & 0x04) >> 2));
-            Console.WriteLine("    digout HiZ:            " + ((auxiliaryData[stream][2][RamOffset + 3] & 0x02) >> 1));
-            Console.WriteLine("    digout:                " + ((auxiliaryData[stream][2][RamOffset + 3] & 0x01) >> 0));
-            Console.WriteLine("    weak MISO:             " + ((auxiliaryData[stream][2][RamOffset + 4] & 0x80) >> 7));
-            Console.WriteLine("    twoscomp:              " + ((auxiliaryData[stream][2][RamOffset + 4] & 0x40) >> 6));
-            Console.WriteLine("    absmode:               " + ((auxiliaryData[stream][2][RamOffset + 4] & 0x20) >> 5));
-            Console.WriteLine("    DSPen:                 " + ((auxiliaryData[stream][2][RamOffset + 4] & 0x10) >> 4));
-            Console.WriteLine("    DSP cutoff freq:       " + ((auxiliaryData[stream][2][RamOffset + 4] & 0x0f) >> 0));
-            Console.WriteLine("    Zcheck DAC power:      " + ((auxiliaryData[stream][2][RamOffset + 5] & 0x40) >> 6));
-            Console.WriteLine("    Zcheck load:           " + ((auxiliaryData[stream][2][RamOffset + 5] & 0x20) >> 5));
-            Console.WriteLine("    Zcheck scale:          " + ((auxiliaryData[stream][2][RamOffset + 5] & 0x18) >> 3));
-            Console.WriteLine("    Zcheck conn all:       " + ((auxiliaryData[stream][2][RamOffset + 5] & 0x04) >> 2));
-            Console.WriteLine("    Zcheck sel pol:        " + ((auxiliaryData[stream][2][RamOffset + 5] & 0x02) >> 1));
-            Console.WriteLine("    Zcheck en:             " + ((auxiliaryData[stream][2][RamOffset + 5] & 0x01) >> 0));
-            Console.WriteLine("    Zcheck DAC:            " + ((auxiliaryData[stream][2][RamOffset + 6] & 0xff) >> 0));
-            Console.WriteLine("    Zcheck select:         " + ((auxiliaryData[stream][2][RamOffset + 7] & 0x3f) >> 0));
-            Console.WriteLine("    ADC aux1 en:           " + ((auxiliaryData[stream][2][RamOffset + 9] & 0x80) >> 7));
-            Console.WriteLine("    ADC aux2 en:           " + ((auxiliaryData[stream][2][RamOffset + 11] & 0x80) >> 7));
-            Console.WriteLine("    ADC aux3 en:           " + ((auxiliaryData[stream][2][RamOffset + 13] & 0x80) >> 7));
-            Console.WriteLine("    offchip RH1:           " + ((auxiliaryData[stream][2][RamOffset + 8] & 0x80) >> 7));
-            Console.WriteLine("    offchip RH2:           " + ((auxiliaryData[stream][2][RamOffset + 10] & 0x80) >> 7));
-            Console.WriteLine("    offchip RL:            " + ((auxiliaryData[stream][2][RamOffset + 12] & 0x80) >> 7));
+            Console.WriteLine("    ADC reference BW:      " + ((auxiliaryData[stream][2, RamOffset + 0] & 0xc0) >> 6));
+            Console.WriteLine("    amp fast settle:       " + ((auxiliaryData[stream][2, RamOffset + 0] & 0x20) >> 5));
+            Console.WriteLine("    amp Vref enable:       " + ((auxiliaryData[stream][2, RamOffset + 0] & 0x10) >> 4));
+            Console.WriteLine("    ADC comparator bias:   " + ((auxiliaryData[stream][2, RamOffset + 0] & 0x0c) >> 2));
+            Console.WriteLine("    ADC comparator select: " + ((auxiliaryData[stream][2, RamOffset + 0] & 0x03) >> 0));
+            Console.WriteLine("    VDD sense enable:      " + ((auxiliaryData[stream][2, RamOffset + 1] & 0x40) >> 6));
+            Console.WriteLine("    ADC buffer bias:       " + ((auxiliaryData[stream][2, RamOffset + 1] & 0x3f) >> 0));
+            Console.WriteLine("    MUX bias:              " + ((auxiliaryData[stream][2, RamOffset + 2] & 0x3f) >> 0));
+            Console.WriteLine("    MUX load:              " + ((auxiliaryData[stream][2, RamOffset + 3] & 0xe0) >> 5));
+            Console.WriteLine("    tempS2, tempS1:        " + ((auxiliaryData[stream][2, RamOffset + 3] & 0x10) >> 4) + "," +
+                   ((auxiliaryData[stream][2, RamOffset + 3] & 0x08) >> 3));
+            Console.WriteLine("    tempen:                " + ((auxiliaryData[stream][2, RamOffset + 3] & 0x04) >> 2));
+            Console.WriteLine("    digout HiZ:            " + ((auxiliaryData[stream][2, RamOffset + 3] & 0x02) >> 1));
+            Console.WriteLine("    digout:                " + ((auxiliaryData[stream][2, RamOffset + 3] & 0x01) >> 0));
+            Console.WriteLine("    weak MISO:             " + ((auxiliaryData[stream][2, RamOffset + 4] & 0x80) >> 7));
+            Console.WriteLine("    twoscomp:              " + ((auxiliaryData[stream][2, RamOffset + 4] & 0x40) >> 6));
+            Console.WriteLine("    absmode:               " + ((auxiliaryData[stream][2, RamOffset + 4] & 0x20) >> 5));
+            Console.WriteLine("    DSPen:                 " + ((auxiliaryData[stream][2, RamOffset + 4] & 0x10) >> 4));
+            Console.WriteLine("    DSP cutoff freq:       " + ((auxiliaryData[stream][2, RamOffset + 4] & 0x0f) >> 0));
+            Console.WriteLine("    Zcheck DAC power:      " + ((auxiliaryData[stream][2, RamOffset + 5] & 0x40) >> 6));
+            Console.WriteLine("    Zcheck load:           " + ((auxiliaryData[stream][2, RamOffset + 5] & 0x20) >> 5));
+            Console.WriteLine("    Zcheck scale:          " + ((auxiliaryData[stream][2, RamOffset + 5] & 0x18) >> 3));
+            Console.WriteLine("    Zcheck conn all:       " + ((auxiliaryData[stream][2, RamOffset + 5] & 0x04) >> 2));
+            Console.WriteLine("    Zcheck sel pol:        " + ((auxiliaryData[stream][2, RamOffset + 5] & 0x02) >> 1));
+            Console.WriteLine("    Zcheck en:             " + ((auxiliaryData[stream][2, RamOffset + 5] & 0x01) >> 0));
+            Console.WriteLine("    Zcheck DAC:            " + ((auxiliaryData[stream][2, RamOffset + 6] & 0xff) >> 0));
+            Console.WriteLine("    Zcheck select:         " + ((auxiliaryData[stream][2, RamOffset + 7] & 0x3f) >> 0));
+            Console.WriteLine("    ADC aux1 en:           " + ((auxiliaryData[stream][2, RamOffset + 9] & 0x80) >> 7));
+            Console.WriteLine("    ADC aux2 en:           " + ((auxiliaryData[stream][2, RamOffset + 11] & 0x80) >> 7));
+            Console.WriteLine("    ADC aux3 en:           " + ((auxiliaryData[stream][2, RamOffset + 13] & 0x80) >> 7));
+            Console.WriteLine("    offchip RH1:           " + ((auxiliaryData[stream][2, RamOffset + 8] & 0x80) >> 7));
+            Console.WriteLine("    offchip RH2:           " + ((auxiliaryData[stream][2, RamOffset + 10] & 0x80) >> 7));
+            Console.WriteLine("    offchip RL:            " + ((auxiliaryData[stream][2, RamOffset + 12] & 0x80) >> 7));
 
-            int rH1Dac1 = auxiliaryData[stream][2][RamOffset + 8] & 0x3f;
-            int rH1Dac2 = auxiliaryData[stream][2][RamOffset + 9] & 0x1f;
-            int rH2Dac1 = auxiliaryData[stream][2][RamOffset + 10] & 0x3f;
-            int rH2Dac2 = auxiliaryData[stream][2][RamOffset + 11] & 0x1f;
-            int rLDac1 = auxiliaryData[stream][2][RamOffset + 12] & 0x7f;
-            int rLDac2 = auxiliaryData[stream][2][RamOffset + 13] & 0x3f;
-            int rLDac3 = auxiliaryData[stream][2][RamOffset + 13] & 0x40 >> 6;
+            int rH1Dac1 = auxiliaryData[stream][2, RamOffset + 8] & 0x3f;
+            int rH1Dac2 = auxiliaryData[stream][2, RamOffset + 9] & 0x1f;
+            int rH2Dac1 = auxiliaryData[stream][2, RamOffset + 10] & 0x3f;
+            int rH2Dac2 = auxiliaryData[stream][2, RamOffset + 11] & 0x1f;
+            int rLDac1 = auxiliaryData[stream][2, RamOffset + 12] & 0x7f;
+            int rLDac2 = auxiliaryData[stream][2, RamOffset + 13] & 0x3f;
+            int rLDac3 = auxiliaryData[stream][2, RamOffset + 13] & 0x40 >> 6;
 
             double rH1 = 2630.0 + rH1Dac2 * 30800.0 + rH1Dac1 * 590.0;
             double rH2 = 8200.0 + rH2Dac2 * 38400.0 + rH2Dac1 * 730.0;
@@ -194,44 +224,44 @@ namespace Rhythm.Net
                     (rL / 1000).ToString("f2") + " kOhm");
 
             Console.WriteLine("    amp power[31:0]:       " +
-                   ((auxiliaryData[stream][2][RamOffset + 17] & 0x80) >> 7).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 17] & 0x40) >> 6).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 17] & 0x20) >> 5).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 17] & 0x10) >> 4).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 17] & 0x08) >> 3).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 17] & 0x04) >> 2).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 17] & 0x02) >> 1).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 17] & 0x01) >> 0).ToString("f2") + " " +
-                   ((auxiliaryData[stream][2][RamOffset + 16] & 0x80) >> 7).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 16] & 0x40) >> 6).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 16] & 0x20) >> 5).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 16] & 0x10) >> 4).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 16] & 0x08) >> 3).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 16] & 0x04) >> 2).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 16] & 0x02) >> 1).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 16] & 0x01) >> 0).ToString("f2") + " " +
-                   ((auxiliaryData[stream][2][RamOffset + 15] & 0x80) >> 7).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 15] & 0x40) >> 6).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 15] & 0x20) >> 5).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 15] & 0x10) >> 4).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 15] & 0x08) >> 3).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 15] & 0x04) >> 2).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 15] & 0x02) >> 1).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 15] & 0x01) >> 0).ToString("f2") + " " +
-                   ((auxiliaryData[stream][2][RamOffset + 14] & 0x80) >> 7).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 14] & 0x40) >> 6).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 14] & 0x20) >> 5).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 14] & 0x10) >> 4).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 14] & 0x08) >> 3).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 14] & 0x04) >> 2).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 14] & 0x02) >> 1).ToString("f2") +
-                   ((auxiliaryData[stream][2][RamOffset + 14] & 0x01) >> 0).ToString("f2"));
+                   ((auxiliaryData[stream][2, RamOffset + 17] & 0x80) >> 7).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 17] & 0x40) >> 6).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 17] & 0x20) >> 5).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 17] & 0x10) >> 4).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 17] & 0x08) >> 3).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 17] & 0x04) >> 2).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 17] & 0x02) >> 1).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 17] & 0x01) >> 0).ToString("f2") + " " +
+                   ((auxiliaryData[stream][2, RamOffset + 16] & 0x80) >> 7).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 16] & 0x40) >> 6).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 16] & 0x20) >> 5).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 16] & 0x10) >> 4).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 16] & 0x08) >> 3).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 16] & 0x04) >> 2).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 16] & 0x02) >> 1).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 16] & 0x01) >> 0).ToString("f2") + " " +
+                   ((auxiliaryData[stream][2, RamOffset + 15] & 0x80) >> 7).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 15] & 0x40) >> 6).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 15] & 0x20) >> 5).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 15] & 0x10) >> 4).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 15] & 0x08) >> 3).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 15] & 0x04) >> 2).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 15] & 0x02) >> 1).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 15] & 0x01) >> 0).ToString("f2") + " " +
+                   ((auxiliaryData[stream][2, RamOffset + 14] & 0x80) >> 7).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 14] & 0x40) >> 6).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 14] & 0x20) >> 5).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 14] & 0x10) >> 4).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 14] & 0x08) >> 3).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 14] & 0x04) >> 2).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 14] & 0x02) >> 1).ToString("f2") +
+                   ((auxiliaryData[stream][2, RamOffset + 14] & 0x01) >> 0).ToString("f2"));
 
             Console.WriteLine();
 
-            int tempA = auxiliaryData[stream][1][12];
-            int tempB = auxiliaryData[stream][1][20];
-            int vddSample = auxiliaryData[stream][1][28];
+            int tempA = auxiliaryData[stream][1, 12];
+            int tempB = auxiliaryData[stream][1, 20];
+            int vddSample = auxiliaryData[stream][1, 28];
 
             double tempUnitsC = ((double)(tempB - tempA)) / 98.9 - 273.15;
             double tempUnitsF = (9.0 / 5.0) * tempUnitsC + 32.0;
@@ -257,19 +287,19 @@ namespace Rhythm.Net
                 {
                     for (stream = 0; stream < numDataStreams; ++stream)
                     {
-                        WriteWordLittleEndian(saveOut, amplifierData[stream][channel][t]);
+                        WriteWordLittleEndian(saveOut, amplifierData[stream][channel, t]);
                     }
                 }
                 for (channel = 0; channel < 3; ++channel)
                 {
                     for (stream = 0; stream < numDataStreams; ++stream)
                     {
-                        WriteWordLittleEndian(saveOut, auxiliaryData[stream][channel][t]);
+                        WriteWordLittleEndian(saveOut, auxiliaryData[stream][channel, t]);
                     }
                 }
                 for (i = 0; i < 8; ++i)
                 {
-                    WriteWordLittleEndian(saveOut, boardAdcData[i][t]);
+                    WriteWordLittleEndian(saveOut, boardAdcData[i, t]);
                 }
                 WriteWordLittleEndian(saveOut, ttlIn[t]);
                 WriteWordLittleEndian(saveOut, ttlOut[t]);
@@ -277,30 +307,19 @@ namespace Rhythm.Net
         }
 
         // Allocates memory for a 3-D array of integers.
-        void AllocateIntArray3D(ref int[][][] array3D, int xSize, int ySize, int zSize)
+        void AllocateIntArray3D(ref int[][,] array3D, int xSize, int ySize, int zSize)
         {
-            int i, j;
-
             Array.Resize(ref array3D, xSize);
-            for (i = 0; i < xSize; ++i)
+            for (int i = 0; i < xSize; ++i)
             {
-                Array.Resize(ref array3D[i], ySize);
-
-                for (j = 0; j < ySize; ++j)
-                {
-                    Array.Resize(ref array3D[i][j], zSize);
-                }
+                array3D[i] = new int[ySize, zSize];
             }
         }
 
         // Allocates memory for a 2-D array of integers.
-        void AllocateIntArray2D(ref int[][] array2D, int xSize, int ySize)
+        void AllocateIntArray2D(ref int[,] array2D, int xSize, int ySize)
         {
-            int i;
-
-            Array.Resize(ref array2D, xSize);
-            for (i = 0; i < xSize; ++i)
-                Array.Resize(ref array2D[i], ySize);
+            array2D = new int[xSize, ySize];
         }
 
         // Allocates memory for a 1-D array of integers.
