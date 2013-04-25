@@ -657,6 +657,12 @@ namespace Rhythm.Net
             return FIFO_CAPACITY_WORDS;
         }
 
+        // Returns the maximum number of data streams available in the eval board.
+        public static int MaxNumDataStreams()
+        {
+            return MAX_NUM_DATA_STREAMS;
+        }
+
         // Set the delay for sampling the MISO line on a particular SPI port (PortA - PortD), in integer clock
         // steps, where each clock step is 1/2800 of a per-channel sampling period.
         // Note: Cable delay must be updated after sampleRate is changed, since cable delay calculations are
@@ -820,7 +826,7 @@ namespace Rhythm.Net
             {
                 if (dataStreamEnabled[stream] == 0)
                 {
-                    dev.SetWireInValue(OkEndPoint.WireInDataStreamEn, (uint)(0x0001 << stream), (uint)(0xfff0 | (0x0001 << stream)));
+                    dev.SetWireInValue(OkEndPoint.WireInDataStreamEn, (uint)(0x0001 << stream), (uint)(0x0001 << stream));
                     dev.UpdateWireIns();
                     dataStreamEnabled[stream] = 1;
                     ++numDataStreams;
@@ -830,7 +836,7 @@ namespace Rhythm.Net
             {
                 if (dataStreamEnabled[stream] == 1)
                 {
-                    dev.SetWireInValue(OkEndPoint.WireInDataStreamEn, (uint)(0x0000 << stream), (uint)(0xfff0 | (0x0001 << stream)));
+                    dev.SetWireInValue(OkEndPoint.WireInDataStreamEn, (uint)(0x0000 << stream), (uint)(0x0001 << stream));
                     dev.UpdateWireIns();
                     dataStreamEnabled[stream] = 0;
                     numDataStreams--;
