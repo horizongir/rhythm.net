@@ -652,7 +652,7 @@ namespace Rhythm.Net
         // Returns the number of 16-bit words the USB SDRAM FIFO can hold.  The FIFO can actually hold a few
         // thousand words more than the number returned by this method due to FPGA "mini-FIFOs" interfacing
         // with the SDRAM, but this provides a conservative estimate of FIFO capacity.
-        public uint FifoCapacityInWords()
+        public static uint FifoCapacityInWords()
         {
             return FIFO_CAPACITY_WORDS;
         }
