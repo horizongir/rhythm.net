@@ -5,6 +5,18 @@ using System.Text;
 
 namespace Rhythm.Net
 {
+    /// <summary>
+    /// This class creates and manages a data structure representing the internal RAM registers on a RHD2000 chip, and generates
+    /// command lists to configure the chip and perform other functions.
+    /// </summary>
+    /// <remarks>
+    /// Changing the value of variables within an instance of this class does not directly affect
+    /// a RHD2000 chip connected to the FPGA; rather, a command list must be generated from this
+    /// class and then downloaded to the FPGA board using <see cref="Rhd2000EvalBoard.UploadCommandList"/>.
+    /// Typically, one instance of <see cref="Rhd2000Registers"/> will be created for each RHD2000
+    /// chip attached to the Rhythm interface. However, if all chips will receive the same MOSI
+    /// commands, then only one instance of <see cref="Rhd2000Registers"/> is required.
+    /// </remarks>
     public class Rhd2000Registers
     {
         double sampleRate;
@@ -72,6 +84,11 @@ namespace Rhythm.Net
 
         const int MaxCommandLength = 1024; // size of on-FPGA auxiliary command RAM banks
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Rhd2000Registers"/> class.
+        /// Sets the RHD2000 register variables to default values.
+        /// </summary>
+        /// <param name="sampleRate">The per-channel sampling rate (in Hz) of the RHD2000 interface board.</param>
         public Rhd2000Registers(double sampleRate)
         {
             DefineSampleRate(sampleRate);
@@ -134,8 +151,13 @@ namespace Rhythm.Net
             PowerUpAllAmps();           // turn on all amplifiers
         }
 
-        // Define RHD2000 per-channel sampling rate so that certain sampling-rate-dependent registers are set correctly
-        // (This function does not change the sampling rate of the FPGA; for this, use Rhd2000EvalBoard::setSampleRate.)
+        /// <summary>
+        /// Defines the RHD2000 per-channel sampling rate so that certain sample-rate-dependent registers are set correctly.
+        /// </summary>
+        /// <param name="newSampleRate">The per-channel sampling rate (in Hz) of the RHD2000 interface board.</param>
+        /// <remarks>
+        /// This function does not change the sampling rate of the FPGA; for this, use <see cref="Rhd2000EvalBoard.SetSampleRate"/>.
+        /// </remarks>
         public void DefineSampleRate(double newSampleRate)
         {
             sampleRate = newSampleRate;
@@ -189,60 +211,85 @@ namespace Rhythm.Net
             }
         }
 
-        // Enable or disable amplifier fast settle function; drive amplifiers to baseline
-        // if enabled.
+        /// <summary>
+        /// Enables or disables amplifier fast settle function.
+        /// </summary>
+        /// <param name="enabled">Drive amplifiers to baseline if set to true.</param>
         public void SetFastSettle(bool enabled)
         {
             ampFastSettle = (enabled ? 1 : 0);
         }
 
-        // Drive auxiliary digital output low
+        /// <summary>
+        /// Sets the auxiliary digital output variable to low state.
+        /// </summary>
         public void SetDigOutLow()
         {
             digOut = 0;
             digOutHiZ = 0;
         }
 
-        // Drive auxiliary digital output high
+        /// <summary>
+        /// Sets the auxiliary digital output variable to high state.
+        /// </summary>
         public void SetDigOutHigh()
         {
             digOut = 1;
             digOutHiZ = 0;
         }
 
-        // Set auxiliary digital output to high-impedance (HiZ) state
+        /// <summary>
+        /// Sets the auxiliary digital output variable to high-impedance (HiZ) state.
+        /// </summary>
         public void SetDigOutHiZ()
         {
             digOut = 0;
             digOutHiZ = 1;
         }
 
-        // Enable or disable ADC auxiliary input 1
+        /// <summary>
+        /// Enables or disables ADC auxiliary input 1.
+        /// </summary>
+        /// <param name="enabled">Enables the ADC auxiliary input if set to true or disables it if set to false.</param>
         public void EnableAux1(bool enabled)
         {
             adcAux1En = (enabled ? 1 : 0);
         }
 
-        // Enable or disable ADC auxiliary input 2
+        /// <summary>
+        /// Enables or disables ADC auxiliary input 2.
+        /// </summary>
+        /// <param name="enabled">Enables the ADC auxiliary input if set to true or disables it if set to false.</param>
         public void EnableAux2(bool enabled)
         {
             adcAux2En = (enabled ? 1 : 0);
         }
 
-        // Enable or disable ADC auxiliary input 3
+        /// <summary>
+        /// Enables or disables ADC auxiliary input 3.
+        /// </summary>
+        /// <param name="enabled">Enables the ADC auxiliary input if set to true or disables it if set to false.</param>
         public void EnableAux3(bool enabled)
         {
             adcAux3En = (enabled ? 1 : 0);
         }
 
-        // Enable or disable DSP offset removal filter
+        /// <summary>
+        /// Enables or disables the DSP offset removal filter.
+        /// </summary>
+        /// <param name="enabled">Enables the DSP offset removal filter if set to true or disables it if set to false.</param>
         public void EnableDsp(bool enabled)
         {
             dspEn = (enabled ? 1 : 0);
         }
 
-        // Set the DSP offset removal filter cutoff frequency as closely to the requested
-        // newDspCutoffFreq (in Hz) as possible; returns the actual cutoff frequency (in Hz).
+        /// <summary>
+        /// Sets the DSP offset removal filter cutoff frequency as closely to the requested
+        /// <paramref name="newDspCutoffFreq"/> (in Hz) as possible and returns the actual
+        /// cutoff frequency (in Hz).
+        /// </summary>
+        /// <param name="newDspCutoffFreq">The desired DSP offset removal filter cutoff frequency (in Hz).</param>
+        /// <returns>The actual cutoff frequency (in Hz).</returns>
         public double SetDspCutoffFreq(double newDspCutoffFreq)
         {
             int n;
@@ -288,7 +335,10 @@ namespace Rhythm.Net
             return fCutoff[dspCutoffFreq];
         }
 
-        // Returns the current value of the DSP offset removal cutoff frequency (in Hz).
+        /// <summary>
+        /// Returns the current value of the DSP offset removal cutoff frequency (in Hz).
+        /// </summary>
+        /// <returns>The current value of the DSP offset removal cutoff frequency (in Hz).</returns>
         public double GetDspCutoffFreq()
         {
             double x;
@@ -297,21 +347,29 @@ namespace Rhythm.Net
             return sampleRate * Math.Log(x / (x - 1.0)) / (2 * Math.PI);
         }
 
-        // Enable or disable impedance checking mode
+        /// <summary>
+        /// Enables or disables impedance checking mode.
+        /// </summary>
+        /// <param name="enabled">Enables impedance checking mode if set to true or disables it if set to false.</param>
         public void EnableZcheck(bool enabled)
         {
             zcheckEn = (enabled ? 1 : 0);
         }
 
-        // Power up or down impedance checking DAC
+        /// <summary>
+        /// Powers up or down impedance testing DAC.
+        /// </summary>
+        /// <param name="enabled">Powers up impedance testing DAC if set to true or powers it down if set to false.</param>
         public void SetZcheckDacPower(bool enabled)
         {
             zcheckDacPower = (enabled ? 1 : 0);
         }
 
-        // Select the series capacitor used to convert the voltage waveform generated by the on-chip
-        // DAC into an AC current waveform that stimulates a selected electrode for impedance testing
-        // (ZcheckCs100fF, ZcheckCs1pF, or Zcheck10pF).
+        /// <summary>
+        /// Selects the series capacitor used to convert the voltage waveform generated by the on-chip
+        /// DAC into an AC current waveform that stimulates a selected electrode for impedance testing.
+        /// </summary>
+        /// <param name="scale">The series capacitor used for impedance testing.</param>
         public void SetZcheckScale(ZcheckCs scale)
         {
             switch (scale)
@@ -328,8 +386,10 @@ namespace Rhythm.Net
             }
         }
 
-        // Select impedance testing of positive or negative amplifier inputs (RHD2216 only), based
-        // on the variable polarity (ZcheckPositiveInput or ZcheckNegativeInput)
+        /// <summary>
+        /// Selects impedance testing of positive or negative amplifier inputs (RHD2216 only).
+        /// </summary>
+        /// <param name="polarity">The amplifier input polarity to use for impedance testing.</param>
         public void SetZcheckPolarity(ZcheckPolarity polarity)
         {
             switch (polarity)
@@ -343,7 +403,11 @@ namespace Rhythm.Net
             }
         }
 
-        // Select the amplifier channel (0-31) for impedance testing.
+        /// <summary>
+        /// Selects the amplifier channel (0-31) for impedance testing.
+        /// </summary>
+        /// <param name="channel">The amplifier channel (0-31) to use for impedance testing.</param>
+        /// <returns>The selected amplifier channel if valid, -1 otherwise.</returns>
         public int SetZcheckChannel(int channel)
         {
             if (channel < 0 || channel > 31)
@@ -358,7 +422,11 @@ namespace Rhythm.Net
 
         }
 
-        // Power up or down selected amplifier on chip
+        /// <summary>
+        /// Powers up or down the selected amplifier on the RHD2000 chip.
+        /// </summary>
+        /// <param name="channel">The amplifier channel (0-31) to power up or down.</param>
+        /// <param name="powered">Powers up the specified channel if set to true or powers it down if set to false.</param>
         public void SetAmpPowered(int channel, bool powered)
         {
             if (channel >= 0 && channel <= 31)
@@ -367,7 +435,9 @@ namespace Rhythm.Net
             }
         }
 
-        // Power up all amplifiers on chip
+        /// <summary>
+        /// Powers up all amplifiers on the RHD2000 chip.
+        /// </summary>
         public void PowerUpAllAmps()
         {
             for (int channel = 0; channel < aPwr.Length; ++channel)
@@ -376,7 +446,9 @@ namespace Rhythm.Net
             }
         }
 
-        // Power down all amplifiers on chip
+        /// <summary>
+        /// Powers down all amplifiers on the RHD2000 chip.
+        /// </summary>
         public void PowerDownAllAmps()
         {
             for (int channel = 0; channel < aPwr.Length; ++channel)
@@ -385,8 +457,12 @@ namespace Rhythm.Net
             }
         }
 
-        // Returns the value of a selected RAM register (0-17) on the RHD2000 chip, based
-        // on the current register variables in the class instance.
+        /// <summary>
+        /// Returns the value of a selected RAM register (0-17) on the RHD2000 chip, based
+        /// on the current register variables in the class instance.
+        /// </summary>
+        /// <param name="reg">The selected RHD2000 RAM register (0-17).</param>
+        /// <returns>The value of the selected RHD2000 RAM register.</returns>
         public int GetRegisterValue(int reg)
         {
             int regout;
@@ -463,8 +539,12 @@ namespace Rhythm.Net
             return regout;
         }
 
-        // Sets the on-chip RH1 and RH2 DAC values appropriately to set a particular amplifier
-        // upper bandwidth (in Hz).  Returns an estimate of the actual upper bandwidth achieved.
+        /// <summary>
+        /// Sets the on-chip RH1 and RH2 DAC values appropriately to set a particular amplifier
+        /// upper bandwidth (in Hz). Returns an estimate of the actual upper bandwidth achieved.
+        /// </summary>
+        /// <param name="upperBandwidth">The desired amplifier upper bandwidth (in Hz).</param>
+        /// <returns>An estimate of the actual upper bandwidth achieved.</returns>
         public double SetUpperBandwidth(double upperBandwidth)
         {
             const double RH1Base = 2200.0;
@@ -572,8 +652,12 @@ namespace Rhythm.Net
             return actualUpperBandwidth;
         }
 
-        // Sets the on-chip RL DAC values appropriately to set a particular amplifier
-        // lower bandwidth (in Hz).  Returns an estimate of the actual lower bandwidth achieved.
+        /// <summary>
+        /// Sets the on-chip RL DAC values appropriately to set a particular amplifier
+        /// lower bandwidth (in Hz). Returns an estimate of the actual lower bandwidth achieved.
+        /// </summary>
+        /// <param name="lowerBandwidth">The desired amplifier lower bandwidth (in Hz).</param>
+        /// <returns>An estimate of the actual lower bandwidth achieved.</returns>
         public double SetLowerBandwidth(double lowerBandwidth)
         {
             const double RLBase = 3500.0;
@@ -649,9 +733,13 @@ namespace Rhythm.Net
             return actualLowerBandwidth;
         }
 
-        // Create a list of 60 commands to program most RAM registers on a RHD2000 chip, read those values
-        // back to confirm programming, read ROM registers, and (if calibrate == true) run ADC calibration.
-        // Returns the length of the command list.
+        /// <summary>
+        /// Creates a list of 60 commands to program most RAM registers on a RHD2000 chip, read those values
+        /// back to confirm programming, read ROM registers, and, if calibrate is set to true, run ADC calibration.
+        /// </summary>
+        /// <param name="commandList">The command list that will be used for register configuration.</param>
+        /// <param name="calibrate">Run ADC calibration if set to true.</param>
+        /// <returns>The length of the command list.</returns>
         public int CreateCommandListRegisterConfig(List<int> commandList, bool calibrate)
         {
             commandList.Clear();    // if command list already exists, erase it and start a new one
@@ -745,17 +833,25 @@ namespace Rhythm.Net
             return commandList.Count;
         }
 
-        // Create a list of 60 commands to sample auxiliary ADC inputs, temperature sensor, and supply
-        // voltage sensor.  One temperature reading (one sample of ResultA and one sample of ResultB)
-        // is taken during this 60-command sequence.  One supply voltage sample is taken.  Auxiliary
-        // ADC inputs are continuously sampled at 1/4 the amplifier sampling rate.
-        //
-        // Since this command list consists of writing to Register 3, it also sets the state of the
-        // auxiliary digital output.  If the digital output value needs to be changed dynamically,
-        // then variations of this command list need to be generated for each state and programmed into
-        // different RAM banks, and the appropriate command list selected at the right time.
-        //
-        // Returns the length of the command list.
+        /// <summary>
+        /// Creates a list of 60 commands to sample auxiliary ADC inputs, temperature sensor,
+        /// and supply voltage sensor.
+        /// </summary>
+        /// <param name="commandList">
+        /// The command list that will be used to sample auxiliary ADC inputs, temperature sensor
+        /// and supply voltage sensor.
+        /// </param>
+        /// <returns>The length of the command list.</returns>
+        /// <remarks>
+        /// One temperature reading (one sample of ResultA and one sample of ResultB)
+        /// is taken during this 60-command sequence.  One supply voltage sample is taken.  Auxiliary
+        /// ADC inputs are continuously sampled at 1/4 the amplifier sampling rate.
+        ///
+        /// Since this command list consists of writing to Register 3, it also sets the state of the
+        /// auxiliary digital output.  If the digital output value needs to be changed dynamically,
+        /// then variations of this command list need to be generated for each state and programmed into
+        /// different RAM banks, and the appropriate command list selected at the right time.
+        /// </remarks>
         public int CreateCommandListTempSensor(List<int> commandList)
         {
             int i;
@@ -818,10 +914,18 @@ namespace Rhythm.Net
             return commandList.Count;
         }
 
-        // Create a list of up to 1024 commands to generate a sine wave of particular frequency (in Hz) and
-        // amplitude (in DAC steps, 0-128) using the on-chip impedance testing voltage DAC.  If frequency is set to zero,
-        // a DC baseline waveform is created.
-        // Returns the length of the command list.
+        /// <summary>
+        /// Creates a list of up to 1024 commands to generate a sine wave of particular frequency (in Hz) and
+        /// amplitude (in DAC steps, 0-128) using the on-chip impedance testing voltage DAC.
+        /// </summary>
+        /// <param name="commandList">The command list that will be used for impedance testing.</param>
+        /// <param name="frequency">
+        /// The frequency (in Hz) of the impedance testing voltage sine wave. If frequency is set to zero,
+        /// a DC baseline waveform is created, which can be used when impedance testing is disabled to
+        /// minimize on-chip noise.
+        /// </param>
+        /// <param name="amplitude">The amplitude (in DAC steps, 0-128) of the impedance testing voltage sine wave.</param>
+        /// <returns>The length of the command list.</returns>
         public int CreateCommandListZcheckDac(List<int> commandList, double frequency, double amplitude)
         {
             int i, period, value;
@@ -878,7 +982,11 @@ namespace Rhythm.Net
             return commandList.Count;
         }
 
-        // Return a 16-bit MOSI command (CALIBRATE or CLEAR)
+        /// <summary>
+        /// Returns a 16-bit MOSI command.
+        /// </summary>
+        /// <param name="commandType">The type of MOSI command to generate (CALIBRATE or CLEAR).</param>
+        /// <returns>The 16-bit MOSI command.</returns>
         public int CreateRhd2000Command(Rhd2000CommandType commandType)
         {
             switch (commandType)
@@ -892,7 +1000,12 @@ namespace Rhythm.Net
             }
         }
 
-        // Return a 16-bit MOSI command (CONVERT or READ)
+        /// <summary>
+        /// Returns a 16-bit MOSI command.
+        /// </summary>
+        /// <param name="commandType">The type of MOSI command to generate (CONVERT or READ).</param>
+        /// <param name="arg1">The register or channel to convert or read.</param>
+        /// <returns>The 16-bit MOSI command.</returns>
         public int CreateRhd2000Command(Rhd2000CommandType commandType, int arg1)
         {
             switch (commandType)
@@ -916,7 +1029,13 @@ namespace Rhythm.Net
             }
         }
 
-        // Return a 16-bit MOSI command (WRITE)
+        /// <summary>
+        /// Returns a 16-bit MOSI command.
+        /// </summary>
+        /// <param name="commandType">The type of MOSI command to generate (WRITE).</param>
+        /// <param name="arg1">The register on which to write.</param>
+        /// <param name="arg2">The value to write on the specified register.</param>
+        /// <returns>The 16-bit MOSI command.</returns>
         public int CreateRhd2000Command(Rhd2000CommandType commandType, int arg1, int arg2)
         {
             switch (commandType)
