@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>$id$</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>$author$</authors>
+    <owners>$author$</owners>
+    <licenseUrl>https://bitbucket.org/horizongir/rhythm.net/raw/c50396afe5a176b08f3bd06b98046706ae29b453/LICENSE</licenseUrl>
+    <projectUrl>https://bitbucket.org/horizongir/rhythm.net</projectUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>$description$</description>
+    <releaseNotes>First public release of the Rhythm.NET library.</releaseNotes>
+    <copyright>Gonçalo Lopes © 2014</copyright>
+    <tags>Rhythm Ephys Electrophysiology</tags>
+  </metadata>
+  <files>
+    <file src="..\Externals\okFrontPanel\**\ok*.dll" target="build\native\bin"/>
+    <file src="..\Externals\okFrontPanel\**\*-pinv.dll" target="build\native\bin"/>
+    <file src="..\Externals\okFrontPanel\**\*-csharp.dll" target="lib\net40"/>
+  </files>
+</package>
