@@ -52,6 +52,7 @@
     <Compile Include="Types.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Rhythm.Net.targets" />
     <None Include="Rhythm.Net.nuspec">
       <SubType>Designer</SubType>
     </None>

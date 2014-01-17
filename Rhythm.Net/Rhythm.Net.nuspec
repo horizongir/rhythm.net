@@ -15,6 +15,7 @@
     <tags>Rhythm Ephys Electrophysiology</tags>
   </metadata>
   <files>
+    <file src="Rhythm.Net.targets" target="build\net40"/>
     <file src="..\Externals\okFrontPanel\**\ok*.dll" target="build\native\bin"/>
     <file src="..\Externals\okFrontPanel\**\*-pinv.dll" target="build\native\bin"/>
     <file src="..\Externals\okFrontPanel\**\*-csharp.dll" target="lib\net40"/>
