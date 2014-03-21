@@ -11,8 +11,9 @@ namespace Rhythm.Net
     /// This class provides access to and control of the Opal Kelly XEM6010 USB/FPGA interface board running the Rhythm interface
     /// Verilog code. Only one instance of the <see cref="Rhd2000EvalBoard"/> object is needed to control a Rhythm-based FPGA interface.
     /// </summary>
-    public class Rhd2000EvalBoard
+    public class Rhd2000EvalBoard : IDisposable
     {
+        bool disposed;
         const int USB_BUFFER_SIZE = 2400000;
         const uint RHYTHM_BOARD_ID = 500;
         const int MAX_NUM_DATA_STREAMS = 8;
@@ -1408,6 +1409,29 @@ namespace Rhythm.Net
             value = dev.GetWireOutValue(OkEndPoint.WireOutDataClkLocked);
 
             return ((value & 0x0001) > 0);
+        }
+
+        void IDisposable.Dispose()
+        {
+            Close();
+        }
+
+        /// <summary>
+        /// Closes the FPGA connection and releases any resources used by the
+        /// <see cref="Rhd2000EvalBoard"/>.
+        /// </summary>
+        public void Close()
+        {
+            if (!disposed)
+            {
+                if (dev != null)
+                {
+                    dev.Dispose();
+                    dev = null;
+                }
+
+                disposed = true;
+            }
         }
     }
 }
