@@ -23,6 +23,7 @@ namespace Rhythm.Net
         AmplifierSampleRate sampleRate;
         int numDataStreams; // total number of data streams currently enabled
         int[] dataStreamEnabled = new int[MAX_NUM_DATA_STREAMS]; // 0 (disabled) or 1 (enabled)
+        int[] cableDelay = new int[4];
 
         // Buffer for reading bytes from USB interface
         byte[] usbBuffer = new byte[USB_BUFFER_SIZE];
@@ -219,11 +220,33 @@ namespace Rhythm.Net
             SelectDacDataChannel(6, 0);
             SelectDacDataChannel(7, 0);
 
-            SetDacManual(DacManual.DacManual1, 32768);    // midrange value = 0 V
-            SetDacManual(DacManual.DacManual2, 32768);    // midrange value = 0 V
+            SetDacManual(32768);    // midrange value = 0 V
 
             SetDacGain(0);
             SetAudioNoiseSuppress(0);
+
+            SetTtlMode(1);          // Digital outputs 0-7 are DAC comparators; 8-15 under manual control
+
+            SetDacThreshold(0, 32768, true);
+            SetDacThreshold(1, 32768, true);
+            SetDacThreshold(2, 32768, true);
+            SetDacThreshold(3, 32768, true);
+            SetDacThreshold(4, 32768, true);
+            SetDacThreshold(5, 32768, true);
+            SetDacThreshold(6, 32768, true);
+            SetDacThreshold(7, 32768, true);
+
+            EnableExternalFastSettle(false);
+            SetExternalFastSettleChannel(0);
+
+            EnableExternalDigOut(BoardPort.PortA, false);
+            EnableExternalDigOut(BoardPort.PortB, false);
+            EnableExternalDigOut(BoardPort.PortC, false);
+            EnableExternalDigOut(BoardPort.PortD, false);
+            SetExternalDigOutChannel(BoardPort.PortA, 0);
+            SetExternalDigOutChannel(BoardPort.PortB, 0);
+            SetExternalDigOutChannel(BoardPort.PortC, 0);
+            SetExternalDigOutChannel(BoardPort.PortD, 0);
         }
 
         /// <summary>
@@ -744,22 +767,29 @@ namespace Rhythm.Net
 
             if (delay < 0 || delay > 15)
             {
-                throw new ArgumentException("delay out of range.", "delay");
+                Console.Error.WriteLine("Warning in Rhd2000EvalBoard.SetCableDelay: delay out of range.");
             }
+
+            if (delay < 0) delay = 0;
+            if (delay > 15) delay = 15;
 
             switch (port)
             {
                 case BoardPort.PortA:
                     bitShift = 0;
+                    cableDelay[0] = delay;
                     break;
                 case BoardPort.PortB:
                     bitShift = 4;
+                    cableDelay[1] = delay;
                     break;
                 case BoardPort.PortC:
                     bitShift = 8;
+                    cableDelay[2] = delay;
                     break;
                 case BoardPort.PortD:
                     bitShift = 12;
+                    cableDelay[3] = delay;
                     break;
                 default:
                     throw new ArgumentException("port out of range.", "port");
@@ -787,17 +817,14 @@ namespace Rhythm.Net
             const double xilinxLvdsOutputDelay = 1.9e-9;    // 1.9 ns Xilinx LVDS output pin delay
             const double xilinxLvdsInputDelay = 1.4e-9;     // 1.4 ns Xilinx LVDS input pin delay
             const double rhd2000Delay = 9.0e-9;             // 9.0 ns RHD2000 SCLK-to-MISO delay
-            const double misoSettleTime = 10.0e-9;          // 10.0 ns delay after MISO changes, before we sample it
+            const double misoSettleTime = 6.7e-9;          // 6.7 ns delay after MISO changes, before we sample it
 
             tStep = 1.0 / (2800.0 * GetSampleRate());  // data clock that samples MISO has a rate 35 x 80 = 2800x higher than the sampling rate
-            cableVelocity = 0.67 * speedOfLight;  // propogation velocity on cable is rougly 2/3 the speed of light
+            cableVelocity = 0.555 * speedOfLight;  // propogation velocity on cable: improvement based on cable measurements
             distance = 2.0 * lengthInMeters;      // round trip distance data must travel on cable
-            timeDelay = distance / cableVelocity + xilinxLvdsOutputDelay + rhd2000Delay + xilinxLvdsInputDelay + misoSettleTime;
+            timeDelay = (distance / cableVelocity) + xilinxLvdsOutputDelay + rhd2000Delay + xilinxLvdsInputDelay + misoSettleTime;
 
-            delay = (int)Math.Ceiling(timeDelay / tStep);
-
-            // cout << "Total delay = " << (1e9 * timeDelay) << " ns" << endl;
-            // cout << "setCableLength: setting delay to " << delay << endl;
+            delay = (int)Math.Floor(((timeDelay / tStep) + 1.0) + 0.5);
 
             if (delay < 1) delay = 1;   // delay of zero is too short (due to I/O delays), even for zero-length cables
 
@@ -816,7 +843,7 @@ namespace Rhythm.Net
         /// </remarks>
         public void SetCableLengthFeet(BoardPort port, double lengthInFeet)
         {
-            SetCableLengthMeters(port, 0.03048 * lengthInFeet);   // convert feet to meters
+            SetCableLengthMeters(port, 0.3048 * lengthInFeet);   // convert feet to meters
         }
 
         /// <summary>
@@ -832,11 +859,12 @@ namespace Rhythm.Net
             const double xilinxLvdsOutputDelay = 1.9e-9;    // 1.9 ns Xilinx LVDS output pin delay
             const double xilinxLvdsInputDelay = 1.4e-9;     // 1.4 ns Xilinx LVDS input pin delay
             const double rhd2000Delay = 9.0e-9;             // 9.0 ns RHD2000 SCLK-to-MISO delay
+            const double misoSettleTime = 6.7e-9;          // 6.7 ns delay after MISO changes, before we sample it
 
             tStep = 1.0 / (2800.0 * GetSampleRate());  // data clock that samples MISO has a rate 35 x 80 = 2800x higher than the sampling rate
-            cableVelocity = 0.67 * speedOfLight;  // propogation velocity on cable is rougly 2/3 the speed of light
+            cableVelocity = 0.555 * speedOfLight;  // propogation velocity on cable: improvement based on cable measurements
 
-            distance = cableVelocity * (delay * tStep - (xilinxLvdsOutputDelay + rhd2000Delay + xilinxLvdsInputDelay));
+            distance = cableVelocity * ((((double)delay) - 1.0) * tStep - (xilinxLvdsOutputDelay + rhd2000Delay + xilinxLvdsInputDelay + misoSettleTime));
             if (distance < 0.0) distance = 0.0;
 
             return (distance / 2.0);
@@ -1014,26 +1042,19 @@ namespace Rhythm.Net
         }
 
         /// <summary>
-        /// Sets one of the two manual AD5662 DAC control WireIns to the specified value (0-65536).
+        /// Sets the manual AD5662 DAC control WireIns to the specified value (0-65536).
         /// </summary>
-        /// <param name="dac">The manual AD5662 DAC control WireIn that will be set to the specified value.</param>
-        /// <param name="value">The 16-bit value (0-65536) to which the manual DAC control WireIn will be set.</param>
-        public void SetDacManual(DacManual dac, int value)
+        /// <param name="value">
+        /// The 16-bit value (0-65536) to which the manual DAC control WireIns will be set.
+        /// </param>
+        public void SetDacManual(int value)
         {
             if (value < 0 || value > 65535)
             {
                 throw new ArgumentException("value out of range.", "value");
             }
 
-            switch (dac)
-            {
-                case DacManual.DacManual1:
-                    dev.SetWireInValue(OkEndPoint.WireInDacManual1, (uint)value);
-                    break;
-                case DacManual.DacManual2:
-                    dev.SetWireInValue(OkEndPoint.WireInDacManual2, (uint)value);
-                    break;
-            }
+            dev.SetWireInValue(OkEndPoint.WireInDacManual, (uint)value);
             dev.UpdateWireIns();
         }
 
@@ -1129,7 +1150,8 @@ namespace Rhythm.Net
         }
 
         /// <summary>
-        /// Assigns a particular data stream (0-7) to an AD5662 DAC channel (0-7).
+        /// Assigns a particular data stream (0-7) to an AD5662 DAC channel (0-7). Setting stream
+        /// to 8 selects DacManual1 value; setting stream to 9 selects DacManual2 value.
         /// </summary>
         /// <param name="dacChannel">The DAC channel to which the data stream will be assigned.</param>
         /// <param name="stream">The data stream to assign to the DAC channel.</param>
@@ -1219,6 +1241,234 @@ namespace Rhythm.Net
                     dev.SetWireInValue(OkEndPoint.WireInDacSource8, (uint)(dataChannel << 0), 0x001f);
                     break;
             }
+            dev.UpdateWireIns();
+        }
+
+        /// <summary>
+        /// Enables or disables external triggering of amplifier hardware 'fast settle' function (blanking).
+        /// </summary>
+        /// <param name="enable">
+        /// Enables external triggering of 'fast settle' function if set to true or disables it
+        /// if set to false.
+        /// </param>
+        /// <remarks>
+        /// If external triggering is enabled, the fast settling of amplifiers on all connected
+        /// chips will be controlled in real time via one of the 16 TTL inputs.
+        /// </remarks>
+        public void EnableExternalFastSettle(bool enable)
+        {
+            dev.SetWireInValue(OkEndPoint.WireInMultiUse, (uint)(enable ? 1 : 0));
+            dev.UpdateWireIns();
+            dev.ActivateTriggerIn(OkEndPoint.TrigInExtFastSettle, 0);
+        }
+
+        /// <summary>
+        /// Selects which of the TTL inputs 0-15 is used to perform a hardware 'fast settle' (blanking)
+        /// of the amplifiers if external triggering of fast settling is enabled.
+        /// </summary>
+        /// <param name="channel">
+        /// The TTL input channel used to trigger a 'fast settle' of all connected chips.
+        /// </param>
+        public void SetExternalFastSettleChannel(int channel)
+        {
+            if (channel < 0 || channel > 15)
+            {
+                throw new ArgumentException("channel out of range.", "channel");
+            }
+
+            dev.SetWireInValue(OkEndPoint.WireInMultiUse, (uint)channel);
+            dev.UpdateWireIns();
+            dev.ActivateTriggerIn(OkEndPoint.TrigInExtFastSettle, 1);
+        }
+
+        /// <summary>
+        /// Enables or disables external control of RHD2000 auxiliary digital output pin (auxout).
+        /// </summary>
+        /// <param name="port">
+        /// The SPI port for which to enable or disable external control of RHD2000 auxiliary
+        /// digital output pin.
+        /// </param>
+        /// <param name="enable">
+        /// Enables external control of RHD2000 auxiliary digital output pin if set to true or
+        /// disables it if set to false.
+        /// </param>
+        /// <remarks>
+        /// If external control is enabled, the digital output of all chips connected to a
+        /// selected SPI port will be controlled in real time via one of the 16 TTL inputs.
+        /// </remarks>
+        public void EnableExternalDigOut(BoardPort port, bool enable)
+        {
+            dev.SetWireInValue(OkEndPoint.WireInMultiUse, (uint)(enable ? 1 : 0));
+            dev.UpdateWireIns();
+
+            switch (port)
+            {
+                case BoardPort.PortA:
+                    dev.ActivateTriggerIn(OkEndPoint.TrigInExtDigOut, 0);
+                    break;
+                case BoardPort.PortB:
+                    dev.ActivateTriggerIn(OkEndPoint.TrigInExtDigOut, 1);
+                    break;
+                case BoardPort.PortC:
+                    dev.ActivateTriggerIn(OkEndPoint.TrigInExtDigOut, 2);
+                    break;
+                case BoardPort.PortD:
+                    dev.ActivateTriggerIn(OkEndPoint.TrigInExtDigOut, 3);
+                    break;
+                default:
+                    throw new ArgumentException("port out of range.", "port");
+            }
+        }
+
+        /// <summary>
+        /// Selects which of the TTL inputs 0-15 is used to control the auxiliary digital output
+        /// pin of the chips connected to a particular SPI port, if external control of auxout is enabled.
+        /// </summary>
+        /// <param name="port">
+        /// Specifies the SPI port where the controlled auxiliary digital output pins are connected.
+        /// </param>
+        /// <param name="channel">
+        /// The TTL input channel used to control the auxiliary digital output pin of the chips connected
+        /// to the specified SPI port.
+        /// </param>
+        public void SetExternalDigOutChannel(BoardPort port, int channel)
+        {
+            if (channel < 0 || channel > 15)
+            {
+                throw new ArgumentException("channel out of range.", "channel");
+            }
+
+            dev.SetWireInValue(OkEndPoint.WireInMultiUse, (uint)channel);
+            dev.UpdateWireIns();
+
+            switch (port)
+            {
+                case BoardPort.PortA:
+                    dev.ActivateTriggerIn(OkEndPoint.TrigInExtDigOut, 4);
+                    break;
+                case BoardPort.PortB:
+                    dev.ActivateTriggerIn(OkEndPoint.TrigInExtDigOut, 5);
+                    break;
+                case BoardPort.PortC:
+                    dev.ActivateTriggerIn(OkEndPoint.TrigInExtDigOut, 6);
+                    break;
+                case BoardPort.PortD:
+                    dev.ActivateTriggerIn(OkEndPoint.TrigInExtDigOut, 7);
+                    break;
+                default:
+                    throw new ArgumentException("port out of range.", "port");
+            }
+        }
+
+        /// <summary>
+        /// Enables or disables optional FPGA-implemented digital high-pass filters associated with DAC
+        /// outputs on USB interface board.
+        /// </summary>
+        /// <param name="enable">
+        /// Enables optional high-pass filters associated with DAC outputs if set to true or disables
+        /// them if set to false.
+        /// </param>
+        /// <remarks>
+        /// These one-pole filters can be used to record wideband neural data while viewing only spikes
+        /// without LFPs on the DAC outputs, for example.  This is useful when using the low-latency
+        /// FPGA thresholds to detect spikes and produce digital pulses on the TTL outputs, for example.
+        /// </remarks>
+        public void EnableDacHighpassFilter(bool enable)
+        {
+            dev.SetWireInValue(OkEndPoint.WireInMultiUse, (uint)(enable ? 1 : 0));
+            dev.UpdateWireIns();
+            dev.ActivateTriggerIn(OkEndPoint.TrigInDacHpf, 0);
+        }
+
+        /// <summary>
+        /// Sets cutoff frequency (in Hz) for optional FPGA-implemented digital high-pass filters
+        /// associated with DAC outputs on USB interface board.
+        /// </summary>
+        /// <param name="cutoff">
+        /// The cutoff frequency (in Hz) for the DAC output high-pass filters.
+        /// </param>
+        /// <remarks>
+        /// These one-pole filters can be used to record wideband neural data while viewing only spikes
+        /// without LFPs on the DAC outputs, for example.  This is useful when using the low-latency
+        /// FPGA thresholds to detect spikes and produce digital pulses on the TTL outputs, for example.
+        /// </remarks>
+        public void SetDacHighpassFilter(double cutoff)
+        {
+            double b;
+            int filterCoefficient;
+
+            // Note that the filter coefficient is a function of the amplifier sample rate, so this
+            // function should be called after the sample rate is changed.
+            b = 1.0 - Math.Exp(-2.0 * Math.PI * cutoff / GetSampleRate());
+
+            // In hardware, the filter coefficient is represented as a 16-bit number.
+            filterCoefficient = (int)Math.Floor(65536.0 * b + 0.5);
+
+            if (filterCoefficient < 1)
+            {
+                filterCoefficient = 1;
+            }
+            else if (filterCoefficient > 65535)
+            {
+                filterCoefficient = 65535;
+            }
+
+            dev.SetWireInValue(OkEndPoint.WireInMultiUse, (uint)filterCoefficient);
+            dev.UpdateWireIns();
+            dev.ActivateTriggerIn(OkEndPoint.TrigInDacHpf, 1);
+        }
+
+        /// <summary>
+        /// Sets thresholds for DAC channels; threshold output signals appear on TTL outputs 0-7.
+        /// </summary>
+        /// <param name="dacChannel"></param>
+        /// <param name="threshold">
+        /// The RHD2000 chip ADC output value, falling in the range of 0 to 65535, where the
+        /// 'zero' level is 32768.
+        /// </param>
+        /// <param name="trigPolarity">
+        /// If trigPolarity is true, voltages equaling or rising above the threshold produce a high TTL
+        /// output; otherwise, voltages equaling or falling below the threshold produce a high TTL output.
+        /// </param>
+        public void SetDacThreshold(int dacChannel, int threshold, bool trigPolarity)
+        {
+            if (dacChannel < 0 || dacChannel > 7)
+            {
+                throw new ArgumentException("dacChannel out of range.", "dacChannel");
+            }
+
+            if (threshold < 0 || threshold > 65535)
+            {
+                throw new ArgumentException("threshold out of range.", "threshold");
+            }
+
+            // Set threshold level.
+            dev.SetWireInValue(OkEndPoint.WireInMultiUse, (uint)threshold);
+            dev.UpdateWireIns();
+            dev.ActivateTriggerIn(OkEndPoint.TrigInDacThresh, dacChannel);
+
+            // Set threshold polarity.
+            dev.SetWireInValue(OkEndPoint.WireInMultiUse, (uint)(trigPolarity ? 1 : 0));
+            dev.UpdateWireIns();
+            dev.ActivateTriggerIn(OkEndPoint.TrigInDacThresh, dacChannel + 8);
+        }
+
+        /// <summary>
+        /// Sets the TTL output mode of the board.
+        /// </summary>
+        /// <param name="mode">
+        /// If set to 0, all 16 TTL outputs are under manual control; if set to 1,
+        /// the top 8 TTL outputs are under manual control; while the bottom 8 TTL
+        /// outputs are outputs of DAC comparators.
+        /// </param>
+        public void SetTtlMode(int mode)
+        {
+            if (mode < 0 || mode > 1)
+            {
+                throw new ArgumentException("mode out of range.", "mode");
+            }
+
+            dev.SetWireInValue(OkEndPoint.WireInResetRun, (uint)(mode << 3), 0x0008);
             dev.UpdateWireIns();
         }
 
@@ -1377,6 +1627,68 @@ namespace Rhythm.Net
                     return ("UNKNOWN");
             }
         }
+
+        /// <summary>
+        /// Gets the 4-bit "board mode" input.
+        /// </summary>
+        /// <returns>
+        /// The 4-bit "board mode" input.
+        /// </returns>
+        public int GetBoardMode()
+        {
+            int mode;
+
+            dev.UpdateWireOuts();
+            mode = (int)dev.GetWireOutValue(OkEndPoint.WireOutBoardMode);
+
+            return mode;
+        }
+
+        /// <summary>
+        /// Gets the FPGA cable delay for selected SPI port.
+        /// </summary>
+        /// <param name="port">
+        /// The SPI port for which to return the cable delay.
+        /// </param>
+        /// <returns>
+        /// The FPGA cable delay for selected SPI port.
+        /// </returns>
+        public int GetCableDelay(BoardPort port)
+        {
+            switch (port)
+            {
+                case BoardPort.PortA:
+                    return cableDelay[0];
+                case BoardPort.PortB:
+                    return cableDelay[1];
+                case BoardPort.PortC:
+                    return cableDelay[2];
+                case BoardPort.PortD:
+                    return cableDelay[3];
+                default:
+                    throw new ArgumentException("unknown port.", "port");
+            }
+        }
+
+        /// <summary>
+        /// Copies the FPGA cable delays for all SPI ports onto the specified array.
+        /// </summary>
+        /// <param name="delays">
+        /// The array that will hold the the FPGA cable delays for all SPI ports.
+        /// </param>
+        public void GetCableDelay(int[] delays)
+        {
+            if (delays.Length != cableDelay.Length)
+            {
+                throw new ArgumentException("cable delay array must be of length 4.", "delays");
+            }
+
+            for (int i = 0; i < delays.Length; ++i)
+            {
+                delays[i] = cableDelay[i];
+            }
+        }
+
 
         // Reads system clock frequency from Opal Kelly board (in MHz).  Should be 100 MHz for normal
         // Rhythm operation.
