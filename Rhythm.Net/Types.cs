@@ -348,18 +348,23 @@ namespace Rhythm.Net
         public const int WireInDacSource6 = 0x1b;
         public const int WireInDacSource7 = 0x1c;
         public const int WireInDacSource8 = 0x1d;
-        public const int WireInDacManual1 = 0x1e;
-        public const int WireInDacManual2 = 0x1f;
+        public const int WireInDacManual = 0x1e;
+        public const int WireInMultiUse = 0x1f;
 
         public const int TrigInDcmProg = 0x40;
         public const int TrigInSpiStart = 0x41;
         public const int TrigInRamWrite = 0x42;
+        public const int TrigInDacThresh = 0x43;
+        public const int TrigInDacHpf = 0x44;
+        public const int TrigInExtFastSettle = 0x45;
+        public const int TrigInExtDigOut = 0x46;
 
         public const int WireOutNumWordsLsb = 0x20;
         public const int WireOutNumWordsMsb = 0x21;
         public const int WireOutSpiRunning = 0x22;
         public const int WireOutTtlIn = 0x23;
         public const int WireOutDataClkLocked = 0x24;
+        public const int WireOutBoardMode = 0x25;
         public const int WireOutBoardId = 0x3e;
         public const int WireOutBoardVersion = 0x3f;
 
