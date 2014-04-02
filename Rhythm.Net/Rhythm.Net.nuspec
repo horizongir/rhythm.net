@@ -10,7 +10,7 @@
     <projectUrl>https://bitbucket.org/horizongir/rhythm.net</projectUrl>
     <requireLicenseAcceptance>true</requireLicenseAcceptance>
     <description>$description$</description>
-    <releaseNotes>First public release of the Rhythm.NET library.</releaseNotes>
+    <releaseNotes>Updated port to support Rhythm API 1.4.</releaseNotes>
     <copyright>Gonçalo Lopes © 2014</copyright>
     <tags>Rhythm Ephys Electrophysiology</tags>
   </metadata>
