@@ -24,7 +24,7 @@ namespace Rhythm.Net
         /// Specifies that a series capacitor of 10pF should be used.
         /// </summary>
         ZcheckCs10pF
-    };
+    }
 
     /// <summary>
     /// Specifies the possible amplifier input polarities to use for impedance testing (RHD2216 only).
@@ -40,7 +40,7 @@ namespace Rhythm.Net
         /// Specifies that the negative amplifier input polarity should be used.
         /// </summary>
         ZcheckNegativeInput
-    };
+    }
 
     /// <summary>
     /// Specifies the available MOSI command codes.
@@ -71,7 +71,7 @@ namespace Rhythm.Net
         /// Specifies the MOSI register read command.
         /// </summary>
         Rhd2000CommandRegRead
-    };
+    }
 
     /// <summary>
     /// Specifies the available per-channel sampling rates.
@@ -162,7 +162,7 @@ namespace Rhythm.Net
         /// Specifies a per-channel sampling rate of 30000Hz.
         /// </summary>
         SampleRate30000Hz
-    };
+    }
 
     /// <summary>
     /// Specifies the available auxiliary command slots for SPI ports.
@@ -183,7 +183,7 @@ namespace Rhythm.Net
         /// Specifies the auxiliary command slot 3.
         /// </summary>
         AuxCmd3
-    };
+    }
 
     /// <summary>
     /// Specifies the available board SPI ports.
@@ -209,7 +209,7 @@ namespace Rhythm.Net
         /// Specifies the board SPI port D.
         /// </summary>
         PortD
-    };
+    }
 
     /// <summary>
     /// Specifies the available board SPI data sources for each port. The DDR (double data rate)
@@ -297,7 +297,7 @@ namespace Rhythm.Net
         /// Specifies the board SPI port D2 DDR data source.
         /// </summary>
         PortD2Ddr = 15
-    };
+    }
 
     /// <summary>
     /// Specifies the available manual AD5662 DAC control WireIns on the FPGA.
@@ -313,7 +313,7 @@ namespace Rhythm.Net
         /// Specifies the second manual AD5662 DAC control WireIn.
         /// </summary>
         DacManual2
-    };
+    }
 
     // Opal Kelly module USB interface endpoint addresses
     static class OkEndPoint
@@ -369,5 +369,5 @@ namespace Rhythm.Net
         public const int WireOutBoardVersion = 0x3f;
 
         public const int PipeOutData = 0xa0;
-    };
+    }
 }
