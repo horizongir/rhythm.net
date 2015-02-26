@@ -299,22 +299,6 @@ namespace Rhythm.Net
         PortD2Ddr = 15
     }
 
-    /// <summary>
-    /// Specifies the available manual AD5662 DAC control WireIns on the FPGA.
-    /// </summary>
-    public enum DacManual
-    {
-        /// <summary>
-        /// Specifies the first manual AD5662 DAC control WireIn.
-        /// </summary>
-        DacManual1,
-
-        /// <summary>
-        /// Specifies the second manual AD5662 DAC control WireIn.
-        /// </summary>
-        DacManual2
-    }
-
     // Opal Kelly module USB interface endpoint addresses
     static class OkEndPoint
     {
