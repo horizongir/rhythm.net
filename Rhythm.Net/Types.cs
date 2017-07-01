@@ -342,6 +342,7 @@ namespace Rhythm.Net
         public const int TrigInDacHpf = 0x44;
         public const int TrigInExtFastSettle = 0x45;
         public const int TrigInExtDigOut = 0x46;
+        public const int TrigInOpenEphys = 0x5a;
 
         public const int WireOutNumWordsLsb = 0x20;
         public const int WireOutNumWordsMsb = 0x21;

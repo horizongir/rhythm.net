@@ -14,19 +14,25 @@ namespace Rhythm.Net
     public class Rhd2000EvalBoard : IDisposable
     {
         bool disposed;
-        const int USB_BUFFER_SIZE = 2400000;
-        const uint RHYTHM_BOARD_ID = 500;
-        const int MAX_NUM_DATA_STREAMS = 8;
+        const int USB_BUFFER_SIZE = 2560000;
+        const uint RHYTHM_BOARD_ID_USB2 = 500;
+        const uint RHYTHM_BOARD_ID_USB3 = 600;
+        const int MAX_NUM_DATA_STREAMS_USB2 = 8;
+        const int MAX_NUM_DATA_STREAMS_USB3 = 16;
         const int FIFO_CAPACITY_WORDS = 67108864;
+
+        const int USB3_BLOCK_SIZE = 1024;
+        const int DDR_BLOCK_SIZE = 32;
 
         okCFrontPanel dev;
         AmplifierSampleRate sampleRate;
         int numDataStreams; // total number of data streams currently enabled
-        int[] dataStreamEnabled = new int[MAX_NUM_DATA_STREAMS]; // 0 (disabled) or 1 (enabled)
+        int[] dataStreamEnabled = new int[MAX_NUM_DATA_STREAMS_USB3]; // 0 (disabled) or 1 (enabled)
         int[] cableDelay = new int[4];
 
         // Buffer for reading bytes from USB interface
         byte[] usbBuffer = new byte[USB_BUFFER_SIZE];
+        bool usb3;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Rhd2000EvalBoard"/> class.
@@ -38,7 +44,7 @@ namespace Rhythm.Net
             sampleRate = AmplifierSampleRate.SampleRate30000Hz; // Rhythm FPGA boots up with 30.0 kS/s/channel sampling rate
             numDataStreams = 0;
 
-            for (i = 0; i < MAX_NUM_DATA_STREAMS; ++i)
+            for (i = 0; i < MAX_NUM_DATA_STREAMS_USB3; ++i)
             {
                 dataStreamEnabled[i] = 0;
             }
@@ -68,9 +74,16 @@ namespace Rhythm.Net
             // Find first device in list of type XEM6010LX45.
             for (i = 0; i < nDevices; ++i)
             {
-                if (dev.GetDeviceListModel(i) == okCFrontPanel.BoardModel.brdXEM6010LX45)
+                okCFrontPanel.BoardModel model = dev.GetDeviceListModel(i);
+                if (model == okCFrontPanel.BoardModel.brdXEM6010LX45)
                 {
                     serialNumber = dev.GetDeviceListSerial(i);
+                    break;
+                }
+                else if (model == okCFrontPanel.BoardModel.brdXEM6310LX45)
+                {
+                    serialNumber = dev.GetDeviceListSerial(i);
+                    usb3 = true;
                     break;
                 }
             }
@@ -78,6 +91,7 @@ namespace Rhythm.Net
             // Attempt to open device.
             if (dev.OpenBySerial(serialNumber) != okCFrontPanel.ErrorCode.NoError)
             {
+                usb3 = false;
                 dev.Dispose();
                 throw new InvalidOperationException("Device could not be opened.  Is one connected?");
             }
@@ -134,7 +148,8 @@ namespace Rhythm.Net
             boardId = dev.GetWireOutValue(OkEndPoint.WireOutBoardId);
             boardVersion = dev.GetWireOutValue(OkEndPoint.WireOutBoardVersion);
 
-            if (boardId != RHYTHM_BOARD_ID)
+            var rhythmBoardId = usb3 ? RHYTHM_BOARD_ID_USB3 : RHYTHM_BOARD_ID_USB2;
+            if (boardId != rhythmBoardId)
             {
                 throw new InvalidOperationException("FPGA configuration does not support Rhythm.  Incorrect board ID: " + boardId);
             }
@@ -186,9 +201,20 @@ namespace Rhythm.Net
             SetDataSource(5, BoardDataSource.PortB2);
             SetDataSource(6, BoardDataSource.PortC2);
             SetDataSource(7, BoardDataSource.PortD2);
+            if (usb3)
+            {
+                SetDataSource(8, BoardDataSource.PortA1);
+                SetDataSource(9, BoardDataSource.PortB1);
+                SetDataSource(10, BoardDataSource.PortC1);
+                SetDataSource(11, BoardDataSource.PortD1);
+                SetDataSource(12, BoardDataSource.PortA2);
+                SetDataSource(13, BoardDataSource.PortB2);
+                SetDataSource(14, BoardDataSource.PortC2);
+                SetDataSource(15, BoardDataSource.PortD2);
+            }
 
             EnableDataStream(0, true);        // start with only one data stream enabled
-            for (i = 1; i < MAX_NUM_DATA_STREAMS; i++)
+            for (i = 1; i < MaxNumDataStreams(usb3); i++)
             {
                 EnableDataStream(i, false);
             }
@@ -648,6 +674,17 @@ namespace Rhythm.Net
             dev.UpdateWireIns();
             dev.SetWireInValue(OkEndPoint.WireInResetRun, 0x00, 0x01);
             dev.UpdateWireIns();
+            if (usb3)
+            {
+                dev.SetWireInValue(OkEndPoint.WireInMultiUse, USB3_BLOCK_SIZE / 4);
+                dev.UpdateWireIns();
+                dev.ActivateTriggerIn(OkEndPoint.TrigInOpenEphys, 16);
+                Console.WriteLine("Blocksize set to " + USB3_BLOCK_SIZE);
+                dev.SetWireInValue(OkEndPoint.WireInMultiUse, DDR_BLOCK_SIZE);
+                dev.UpdateWireIns();
+                dev.ActivateTriggerIn(OkEndPoint.TrigInOpenEphys, 17);
+                Console.WriteLine("DDR burst set to " + DDR_BLOCK_SIZE);
+            }
         }
 
         /// <summary>
@@ -745,10 +782,11 @@ namespace Rhythm.Net
         /// <summary>
         /// Returns the maximum number of data streams available in the eval board.
         /// </summary>
+        /// <param name="usb3">Indicates whether the eval board supports USB3.</param>
         /// <returns>The maximum number of data streams available in the eval board.</returns>
-        public static int MaxNumDataStreams()
+        public static int MaxNumDataStreams(bool usb3)
         {
-            return MAX_NUM_DATA_STREAMS;
+            return usb3 ? MAX_NUM_DATA_STREAMS_USB3 : MAX_NUM_DATA_STREAMS_USB2;
         }
 
         /// <summary>
@@ -940,6 +978,38 @@ namespace Rhythm.Net
                     endPoint = OkEndPoint.WireInDataStreamSel5678;
                     bitShift = 12;
                     break;
+                case 8:
+                    endPoint = OkEndPoint.WireInDataStreamSel1234;
+                    bitShift = 16;
+                    break;
+                case 9:
+                    endPoint = OkEndPoint.WireInDataStreamSel1234;
+                    bitShift = 20;
+                    break;
+                case 10:
+                    endPoint = OkEndPoint.WireInDataStreamSel1234;
+                    bitShift = 24;
+                    break;
+                case 11:
+                    endPoint = OkEndPoint.WireInDataStreamSel1234;
+                    bitShift = 28;
+                    break;
+                case 12:
+                    endPoint = OkEndPoint.WireInDataStreamSel5678;
+                    bitShift = 16;
+                    break;
+                case 13:
+                    endPoint = OkEndPoint.WireInDataStreamSel5678;
+                    bitShift = 20;
+                    break;
+                case 14:
+                    endPoint = OkEndPoint.WireInDataStreamSel5678;
+                    bitShift = 24;
+                    break;
+                case 15:
+                    endPoint = OkEndPoint.WireInDataStreamSel5678;
+                    bitShift = 28;
+                    break;
                 default:
                     throw new ArgumentException("stream out of range.", "stream");
             }
@@ -955,7 +1025,7 @@ namespace Rhythm.Net
         /// <param name="enabled">Enables the USB data stream if set to true or disables it if set to false.</param>
         public void EnableDataStream(int stream, bool enabled)
         {
-            if (stream < 0 || stream > (MAX_NUM_DATA_STREAMS - 1))
+            if (stream < 0 || stream > (MaxNumDataStreams(usb3) - 1))
             {
                 throw new ArgumentException("stream out of range.", "stream");
             }
@@ -1088,31 +1158,32 @@ namespace Rhythm.Net
                 throw new ArgumentException("dacChannel out of range.", "dacChannel");
             }
 
+            uint dacEnMask = (uint)(usb3 ? 0x0400 : 0x0200);
             switch (dacChannel)
             {
                 case 0:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource1, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource1, (uint)(enabled ? dacEnMask : 0x0000), dacEnMask);
                     break;
                 case 1:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource2, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource2, (uint)(enabled ? dacEnMask : 0x0000), dacEnMask);
                     break;
                 case 2:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource3, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource3, (uint)(enabled ? dacEnMask : 0x0000), dacEnMask);
                     break;
                 case 3:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource4, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource4, (uint)(enabled ? dacEnMask : 0x0000), dacEnMask);
                     break;
                 case 4:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource5, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource5, (uint)(enabled ? dacEnMask : 0x0000), dacEnMask);
                     break;
                 case 5:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource6, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource6, (uint)(enabled ? dacEnMask : 0x0000), dacEnMask);
                     break;
                 case 6:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource7, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource7, (uint)(enabled ? dacEnMask : 0x0000), dacEnMask);
                     break;
                 case 7:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource8, (uint)(enabled ? 0x0200 : 0x0000), 0x0200);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource8, (uint)(enabled ? dacEnMask : 0x0000), dacEnMask);
                     break;
             }
             dev.UpdateWireIns();
@@ -1162,36 +1233,37 @@ namespace Rhythm.Net
                 throw new ArgumentException("dacChannel out of range.", "dacChannel");
             }
 
-            if (stream < 0 || stream > 9)
+            if (stream < 0 || stream > MaxNumDataStreams(usb3) + 1)
             {
                 throw new ArgumentException("stream out of range.", "stream");
             }
 
+            uint dacStreamMask = (uint)(usb3 ? 0x03e0 : 0x01e0);
             switch (dacChannel)
             {
                 case 0:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource1, (uint)(stream << 5), 0x01e0);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource1, (uint)(stream << 5), dacStreamMask);
                     break;
                 case 1:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource2, (uint)(stream << 5), 0x01e0);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource2, (uint)(stream << 5), dacStreamMask);
                     break;
                 case 2:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource3, (uint)(stream << 5), 0x01e0);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource3, (uint)(stream << 5), dacStreamMask);
                     break;
                 case 3:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource4, (uint)(stream << 5), 0x01e0);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource4, (uint)(stream << 5), dacStreamMask);
                     break;
                 case 4:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource5, (uint)(stream << 5), 0x01e0);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource5, (uint)(stream << 5), dacStreamMask);
                     break;
                 case 5:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource6, (uint)(stream << 5), 0x01e0);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource6, (uint)(stream << 5), dacStreamMask);
                     break;
                 case 6:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource7, (uint)(stream << 5), 0x01e0);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource7, (uint)(stream << 5), dacStreamMask);
                     break;
                 case 7:
-                    dev.SetWireInValue(OkEndPoint.WireInDacSource8, (uint)(stream << 5), 0x01e0);
+                    dev.SetWireInValue(OkEndPoint.WireInDacSource8, (uint)(stream << 5), dacStreamMask);
                     break;
             }
             dev.UpdateWireIns();
@@ -1478,13 +1550,31 @@ namespace Rhythm.Net
         /// </summary>
         public void Flush()
         {
-            while (NumWordsInFifo() >= USB_BUFFER_SIZE / 2)
+            if (usb3)
             {
-                dev.ReadFromPipeOut(OkEndPoint.PipeOutData, USB_BUFFER_SIZE, usbBuffer);
+                dev.SetWireInValue(OkEndPoint.WireInResetRun, 1 << 16, 1 << 16); //Override pipeout block throttle
+                dev.UpdateWireIns();
+                while (NumWordsInFifo() >= USB_BUFFER_SIZE / 2)
+                {
+                    dev.ReadFromBlockPipeOut(OkEndPoint.PipeOutData, USB3_BLOCK_SIZE, USB_BUFFER_SIZE, usbBuffer);
+                }
+                while (NumWordsInFifo() > 0)
+                {
+                    dev.ReadFromBlockPipeOut(OkEndPoint.PipeOutData, USB3_BLOCK_SIZE, USB3_BLOCK_SIZE * Math.Max(2 * (int)NumWordsInFifo() / USB3_BLOCK_SIZE, 1), usbBuffer);
+                }
+                dev.SetWireInValue(OkEndPoint.WireInResetRun, 0, 1 << 16);
+                dev.UpdateWireIns();
             }
-            while (NumWordsInFifo() > 0)
+            else
             {
-                dev.ReadFromPipeOut(OkEndPoint.PipeOutData, (int)(2 * NumWordsInFifo()), usbBuffer);
+                while (NumWordsInFifo() >= USB_BUFFER_SIZE / 2)
+                {
+                    dev.ReadFromPipeOut(OkEndPoint.PipeOutData, USB_BUFFER_SIZE, usbBuffer);
+                }
+                while (NumWordsInFifo() > 0)
+                {
+                    dev.ReadFromPipeOut(OkEndPoint.PipeOutData, (int)(2 * NumWordsInFifo()), usbBuffer);
+                }
             }
         }
 
@@ -1498,14 +1588,22 @@ namespace Rhythm.Net
         {
             int numBytesToRead;
 
-            numBytesToRead = 2 * Rhd2000DataBlock.CalculateDataBlockSizeInWords(numDataStreams);
+            numBytesToRead = 2 * Rhd2000DataBlock.CalculateDataBlockSizeInWords(numDataStreams, usb3);
             if (numBytesToRead > USB_BUFFER_SIZE)
             {
                 throw new InvalidOperationException("USB buffer size exceeded. Increase value of USB_BUFFER_SIZE.");
             }
 
-            dev.ReadFromPipeOut(OkEndPoint.PipeOutData, numBytesToRead, usbBuffer);
-            dataBlock.FillFromUsbBuffer(usbBuffer, 0, numDataStreams);
+            if (usb3)
+            {
+                dev.ReadFromBlockPipeOut(OkEndPoint.PipeOutData, USB3_BLOCK_SIZE, numBytesToRead, usbBuffer);
+            }
+            else
+            {
+                dev.ReadFromPipeOut(OkEndPoint.PipeOutData, numBytesToRead, usbBuffer);
+            }
+
+            dataBlock.FillFromUsbBuffer(usbBuffer, 0);
             return true;
         }
 
@@ -1521,7 +1619,7 @@ namespace Rhythm.Net
             int i;
             Rhd2000DataBlock dataBlock;
 
-            numWordsToRead = numBlocks * Rhd2000DataBlock.CalculateDataBlockSizeInWords(numDataStreams);
+            numWordsToRead = numBlocks * Rhd2000DataBlock.CalculateDataBlockSizeInWords(numDataStreams, usb3);
             if (NumWordsInFifo() < numWordsToRead)
             {
                 return false;
@@ -1533,11 +1631,19 @@ namespace Rhythm.Net
                 throw new InvalidOperationException("USB buffer size exceeded. Increase value of USB_BUFFER_SIZE.");
             }
 
-            dev.ReadFromPipeOut(OkEndPoint.PipeOutData, numBytesToRead, usbBuffer);
+            if (usb3)
+            {
+                dev.ReadFromBlockPipeOut(OkEndPoint.PipeOutData, USB3_BLOCK_SIZE, numBytesToRead, usbBuffer);
+            }
+            else
+            {
+                dev.ReadFromPipeOut(OkEndPoint.PipeOutData, numBytesToRead, usbBuffer);
+            }
+
             for (i = 0; i < numBlocks; ++i)
             {
-                dataBlock = new Rhd2000DataBlock(numDataStreams);
-                dataBlock.FillFromUsbBuffer(usbBuffer, i, numDataStreams);
+                dataBlock = new Rhd2000DataBlock(numDataStreams, usb3);
+                dataBlock.FillFromUsbBuffer(usbBuffer, i);
                 dataQueue.Enqueue(dataBlock);
             }
 
@@ -1689,6 +1795,14 @@ namespace Rhythm.Net
             }
         }
 
+        /// <summary>
+        /// Gets a value indicating whether this board uses the USB3 interface.
+        /// </summary>
+        /// <returns>A value indicating whether this board uses the USB3 interface.</returns>
+        public bool IsUsb3()
+        {
+            return usb3;
+        }
 
         // Reads system clock frequency from Opal Kelly board (in MHz).  Should be 100 MHz for normal
         // Rhythm operation.
