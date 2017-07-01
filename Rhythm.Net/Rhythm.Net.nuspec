@@ -10,9 +10,9 @@
     <projectUrl>https://bitbucket.org/horizongir/rhythm.net</projectUrl>
     <requireLicenseAcceptance>true</requireLicenseAcceptance>
     <description>$description$</description>
-    <releaseNotes>Updated port to support Rhythm API 1.4.</releaseNotes>
-    <copyright>Gonçalo Lopes © 2014</copyright>
-    <tags>Rhythm Ephys Electrophysiology</tags>
+    <releaseNotes>Added support for Open Ephys USB3 boards.</releaseNotes>
+    <copyright>Gonçalo Lopes © 2017</copyright>
+    <tags>Rhythm Open Ephys Electrophysiology</tags>
   </metadata>
   <files>
     <file src="Rhythm.Net.targets" target="build\net40"/>

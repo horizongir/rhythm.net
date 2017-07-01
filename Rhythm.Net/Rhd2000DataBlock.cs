@@ -14,7 +14,8 @@ namespace Rhythm.Net
     /// </summary>
     public class Rhd2000DataBlock
     {
-        const int SAMPLES_PER_DATA_BLOCK = 60;
+        const int SAMPLES_PER_DATA_BLOCK_USB2 = 60;
+        const int SAMPLES_PER_DATA_BLOCK_USB3 = 256;
         const ulong RHD2000_HEADER_MAGIC_NUMBER = 0xc691199927021942;
 
         uint[] timeStamp;
@@ -24,19 +25,25 @@ namespace Rhythm.Net
         int[] ttlIn;
         int[] ttlOut;
 
+        int samplesPerBlock;
+        int dataBlockSize;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="Rhd2000DataBlock"/> class.
         /// Allocates memory for a data block supporting the specified number of data streams.
         /// </summary>
         /// <param name="numDataStreams">The number of available data streams.</param>
-        public Rhd2000DataBlock(int numDataStreams)
+        /// <param name="usb3">Indicates whether the eval board supports USB3.</param>
+        public Rhd2000DataBlock(int numDataStreams, bool usb3)
         {
-            AllocateUIntArray1D(ref timeStamp, SAMPLES_PER_DATA_BLOCK);
-            AllocateIntArray3D(ref amplifierData, numDataStreams, 32, SAMPLES_PER_DATA_BLOCK);
-            AllocateIntArray3D(ref auxiliaryData, numDataStreams, 3, SAMPLES_PER_DATA_BLOCK);
-            AllocateIntArray2D(ref boardAdcData, 8, SAMPLES_PER_DATA_BLOCK);
-            AllocateIntArray1D(ref ttlIn, SAMPLES_PER_DATA_BLOCK);
-            AllocateIntArray1D(ref ttlOut, SAMPLES_PER_DATA_BLOCK);
+            samplesPerBlock = GetSamplesPerDataBlock(usb3);
+            dataBlockSize = CalculateDataBlockSizeInWords(numDataStreams, usb3);
+            AllocateUIntArray1D(ref timeStamp, samplesPerBlock);
+            AllocateIntArray3D(ref amplifierData, numDataStreams, 32, samplesPerBlock);
+            AllocateIntArray3D(ref auxiliaryData, numDataStreams, 3, samplesPerBlock);
+            AllocateIntArray2D(ref boardAdcData, 8, samplesPerBlock);
+            AllocateIntArray1D(ref ttlIn, samplesPerBlock);
+            AllocateIntArray1D(ref ttlOut, samplesPerBlock);
         }
 
         /// <summary>
@@ -92,20 +99,22 @@ namespace Rhythm.Net
         /// <paramref name="numDataStreams"/> data streams enabled.
         /// </summary>
         /// <param name="numDataStreams">The number of enabled data streams.</param>
+        /// <param name="usb3">Indicates whether the eval board supports USB3.</param>
         /// <returns>The number of 16-bit words in the USB data block.</returns>
-        public static int CalculateDataBlockSizeInWords(int numDataStreams)
+        public static int CalculateDataBlockSizeInWords(int numDataStreams, bool usb3)
         {
-            return SAMPLES_PER_DATA_BLOCK * (4 + 2 + numDataStreams * 36 + 8 + 2);
+            return GetSamplesPerDataBlock(usb3) * (4 + 2 + numDataStreams * 36 + 8 + 2);
             // 4 = magic number; 2 = time stamp; 36 = (32 amp channels + 3 aux commands + 1 filler word); 8 = ADCs; 2 = TTL in/out
         }
 
         /// <summary>
         /// Returns the number of samples in a USB data block.
         /// </summary>
+        /// <param name="usb3">Indicates whether the eval board supports USB3.</param>
         /// <returns>The number of samples in a USB data block.</returns>
-        public static uint GetSamplesPerDataBlock()
+        public static int GetSamplesPerDataBlock(bool usb3)
         {
-            return SAMPLES_PER_DATA_BLOCK;
+            return usb3 ? SAMPLES_PER_DATA_BLOCK_USB3 : SAMPLES_PER_DATA_BLOCK_USB2;
         }
 
         /// <summary>
@@ -118,13 +127,13 @@ namespace Rhythm.Net
         /// first data block in the buffer, setting blockIndex to 1 selects the second data
         /// block, etc.
         /// </param>
-        /// <param name="numDataStreams">The number of available data streams.</param>
-        public void FillFromUsbBuffer(byte[] usbBuffer, int blockIndex, int numDataStreams)
+        public void FillFromUsbBuffer(byte[] usbBuffer, int blockIndex)
         {
+            int numDataStreams = amplifierData.Length;
             int index, t, channel, stream, i;
 
-            index = blockIndex * 2 * CalculateDataBlockSizeInWords(numDataStreams);
-            for (t = 0; t < SAMPLES_PER_DATA_BLOCK; ++t)
+            index = blockIndex * 2 * dataBlockSize;
+            for (t = 0; t < samplesPerBlock; ++t)
             {
                 if (!CheckUsbHeader(usbBuffer, index))
                 {
@@ -340,7 +349,7 @@ namespace Rhythm.Net
         {
             int t, channel, stream, i;
 
-            for (t = 0; t < SAMPLES_PER_DATA_BLOCK; ++t)
+            for (t = 0; t < samplesPerBlock; ++t)
             {
                 WriteWordLittleEndian(saveOut, (int)timeStamp[t]);
                 for (channel = 0; channel < 32; ++channel)
