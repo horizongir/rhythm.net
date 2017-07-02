@@ -1071,6 +1071,23 @@ namespace Rhythm.Net
         }
 
         /// <summary>
+        /// Sets the 16 bits of the digital TTL output lines on the FPGA.
+        /// </summary>
+        /// <param name="value">
+        /// The 16-bit value (0-65536) to which the digital TTL output lines will be set.
+        /// </param>
+        public void SetTtlOut(int value)
+        {
+            if (value < 0 || value > 65535)
+            {
+                throw new ArgumentException("value out of range.", "value");
+            }
+
+            dev.SetWireInValue(OkEndPoint.WireInTtlOut, (uint)value);
+            dev.UpdateWireIns();
+        }
+
+        /// <summary>
         /// Sets the 16 bits of the digital TTL output lines on the FPGA high or low according to an integer array.
         /// </summary>
         /// <param name="ttlOutArray">
@@ -1088,6 +1105,18 @@ namespace Rhythm.Net
             }
             dev.SetWireInValue(OkEndPoint.WireInTtlOut, (uint)ttlOut);
             dev.UpdateWireIns();
+        }
+
+        /// <summary>
+        /// Reads the 16 bits of the digital TTL input lines on the FPGA.
+        /// </summary>
+        /// <returns>
+        /// A 16-bit value (0-65536) containing the state of all the digital TTL output lines.
+        /// </returns>
+        public int GetTtlIn()
+        {
+            dev.UpdateWireOuts();
+            return (int)dev.GetWireOutValue(OkEndPoint.WireOutTtlIn);
         }
 
         /// <summary>
